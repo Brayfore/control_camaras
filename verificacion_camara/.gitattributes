@@ -1,0 +1,9 @@
+# Normaliza los finales de línea para todos los archivos de texto
+* text=auto
+
+# Asegura que los archivos JSON usen solo LF
+*.json text eol=lf
+
+# Evita que los archivos en los entornos virtuales se agreguen al repositorio
+*.py[cod] binary
+env/Lib/** binary

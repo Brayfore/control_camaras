@@ -1,4 +1,53 @@
-node_modules/
-.env
+# Ignora los entornos virtuales de Python
+env/
+.venv/
+
+# Ignora archivos compilados de Python
+*.pyc
+__pycache__/
+
+# Ignora configuraciones de IDE
+.vscode/
+.idea/
+
+# Ignora archivos de configuración del sistema operativo
 .DS_Store
-*.log
+Thumbs.db
+
+# Ignora dependencias de Node.js
+node_modules/
+
+# Ignora archivos de log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignora archivos de compilación de frontend (si aplica)
+build/
+dist/
+
+# Ignora resultados de pruebas
+coverage/
+
+# Ignora los archivos de configuración de la máquina local
+*.env
+.env.local
+
+# Ignora archivos de bloqueo de dependencias (si es necesario)
+package-lock.json
+yarn.lock
+
+# Ignora archivos generados por Docker (si aplicas Docker)
+docker-compose.override.yml
+
+# Ignora carpetas relacionadas con la cobertura de pruebas
+.coverage
+coverage/
+
+# Ignora archivos y carpetas de base de datos local
+db.sqlite3
+*.sqlite3
+
+# Ignora archivos de backups
+*.bak
+*.backup

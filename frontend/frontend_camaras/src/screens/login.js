@@ -14,9 +14,12 @@ const Login = () => {
     if (username && password) {
       try {
         await login(username, password); // Llama a la función de login del contexto
+        
+        // Almacena el nombre de usuario en localStorage
+        localStorage.setItem('username', username);
+        
         navigate('/home'); // Redirige a la página de inicio después del login
       } catch (error) {
-        
         alert('Error de autenticación. Por favor, intente nuevamente.');
       }
     } else {

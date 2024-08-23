@@ -11,7 +11,7 @@ class Dvr(models.Model):
         return f"{self.nombre} - {self.ubicacion}"
 
 class RegistroGrabacion(models.Model):
-    fecha = models.DateField(auto_now_add=True)
+    fecha = models.DateTimeField(auto_now_add=True)
     dias_grabacion = models.PositiveIntegerField()
     dvr = models.ForeignKey(Dvr, related_name='registros', on_delete=models.CASCADE)
     verificacion_am = models.BooleanField(default=False)
