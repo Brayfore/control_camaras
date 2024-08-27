@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Box, Modal, Typography, Button, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import '../styles/DeleteDvrModal.css';  // Importamos el archivo CSS
 
 const DeleteDvrModal = ({ open, onClose, dvrs, handleDelete }) => {
   const [selectedDvr, setSelectedDvr] = useState('');
@@ -17,7 +16,19 @@ const DeleteDvrModal = ({ open, onClose, dvrs, handleDelete }) => {
 
   return (
     <Modal open={open} onClose={onClose}>
-      <Box className="delete-dvr-modal">
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '40%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 2,
+        }}
+      >
         <Typography variant="h6" gutterBottom>Eliminar DVR</Typography>
         <FormControl fullWidth sx={{ mt: 2 }}>
           <InputLabel id="select-dvr-label">Seleccione un DVR</InputLabel>
@@ -51,3 +62,4 @@ const DeleteDvrModal = ({ open, onClose, dvrs, handleDelete }) => {
 };
 
 export default DeleteDvrModal;
+
