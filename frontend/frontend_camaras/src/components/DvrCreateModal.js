@@ -75,8 +75,8 @@ const DvrCreateModal = ({ open, onClose, onCreate }) => {
           sx={{ mb: 2 }}
         />
         <TextField
-          label="Capacidad"
-          name="capacidad"
+          label="Almacenamiento"
+          name="capacidad" //Capacidad se refiere a almacenamiento
           value={formData.capacidad}
           onChange={handleChange}
           fullWidth

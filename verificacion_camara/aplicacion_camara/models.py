@@ -18,5 +18,9 @@ class RegistroGrabacion(models.Model):
     verificacion_pm = models.BooleanField(default=False)
     observacion = models.TextField(blank=True)
 
+    fecha_inicio = models.DateField(null=True, blank=True)
+    fecha_final = models.DateField(null=True, blank=True)
+
+
     def __str__(self):
         return f"{self.fecha} - {self.dvr.nombre} - {self.dias_grabacion} días"

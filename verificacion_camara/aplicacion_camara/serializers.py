@@ -33,25 +33,12 @@ class DvrSerializer(serializers.ModelSerializer):
         model = Dvr
         fields = ('id', 'nombre', 'ip', 'capacidad', 'puertos', 'ubicacion')
 
-#class RegistroGrabacionSerializer(serializers.ModelSerializer):
-#   dvr = serializers.PrimaryKeyRelatedField(queryset=Dvr.objects.all())
-
-#   class Meta:
-#      model = RegistroGrabacion
-#        fields = ('id', 'fecha', 'dias_grabacion', 'verificacion_am', 'verificacion_pm', 'observacion', 'dvr')
-
-#  def validate(self, data):
-        # Validaciones personalizadas
-#     if data['dias_grabacion'] <= 0:
-#        raise serializers.ValidationError("Los días de grabación deben ser mayores a 0.")
-#return data
-
 class RegistroGrabacionSerializer(serializers.ModelSerializer):
     dvr = serializers.PrimaryKeyRelatedField(queryset=Dvr.objects.all())
 
     class Meta:
         model = RegistroGrabacion
-        fields = ('id', 'fecha', 'dias_grabacion', 'verificacion_am', 'verificacion_pm', 'observacion', 'dvr')
+        fields = ('id', 'fecha', 'dias_grabacion', 'verificacion_am', 'verificacion_pm', 'observacion', 'dvr', 'fecha_inicio', 'fecha_final')
 
     def validate(self, data):
         dvr = data.get('dvr')
