@@ -10,6 +10,18 @@ class Dvr(models.Model):
     def __str__(self):
         return f"{self.nombre} - {self.ubicacion}"
 
+class Camara(models.Model):
+    nombre = models.CharField(max_length=100)
+    dvr = models.ForeignKey(Dvr, related_name='camaras', on_delete=models.CASCADE)
+    puerto = models.PositiveIntegerField()
+
+    class Meta:
+        unique_together = ('dvr', 'puerto')  # Asegura que cada puerto en un DVR tenga solo una cámara
+
+    def __str__(self):
+        return f"{self.nombre} - DVR: {self.dvr.nombre} - Puerto: {self.puerto}"
+
+
 class RegistroGrabacion(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
     dias_grabacion = models.PositiveIntegerField()
@@ -24,3 +36,4 @@ class RegistroGrabacion(models.Model):
 
     def __str__(self):
         return f"{self.fecha} - {self.dvr.nombre} - {self.dias_grabacion} días"
+    

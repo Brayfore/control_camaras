@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from .models import Dvr, RegistroGrabacion
+from .models import Dvr, RegistroGrabacion, Camara  # Asegúrate de importar el modelo Camara
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 import pytz  # Para manejar zonas horarias
+
 # Serializadores para manejar el registro y la autenticación de usuarios
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -27,12 +28,31 @@ class UserSerializerWithToken(UserSerializer):
         refresh = RefreshToken.for_user(obj)
         return str(refresh.access_token)
 
-# Serializadores para manejar los modelos Dvr y RegistroGrabacion
+# Serializador para manejar el modelo Dvr
 class DvrSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dvr
         fields = ('id', 'nombre', 'ip', 'capacidad', 'puertos', 'ubicacion')
 
+# Serializador para manejar el modelo Camara
+class CamaraSerializer(serializers.ModelSerializer):
+    dvr_nombre =serializers.CharField(source='dvr.nombre', read_only=True)
+    class Meta:
+        model = Camara
+        fields = ['id', 'nombre', 'dvr_nombre', 'puerto']
+
+    # Sobrescribir la validación    
+    def validate(self, data):
+        dvr = data.get('dvr')
+        puerto = data.get('puerto')
+
+        # Verificar si el puerto ya está en uso para este DVR
+        if Camara.objects.filter(dvr=dvr, puerto=puerto).exists():
+            raise serializers.ValidationError(f"El puerto {puerto} ya está en uso para este DVR.")
+
+        return data
+
+# Serializador para manejar el modelo RegistroGrabacion
 class RegistroGrabacionSerializer(serializers.ModelSerializer):
     dvr = serializers.PrimaryKeyRelatedField(queryset=Dvr.objects.all())
 

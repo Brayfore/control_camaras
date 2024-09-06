@@ -3,12 +3,14 @@ import { Box, Drawer, Typography, Button, IconButton } from '@mui/material';
 import { Logout as LogoutIcon, Menu as MenuIcon } from '@mui/icons-material';
 import DvrCreateModal from './DvrCreateModal';
 import DeleteDvrModal from './DeleteDvrModal';
+import CreateCamaraModal from './CreateCamaraModal'; // Importamos el modal para crear cámaras
 import '../styles/ProfileSidebar.css';  // Importamos el archivo CSS
 
 const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr, onShowCameraControl }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isCreateCamaraModalOpen, setIsCreateCamaraModalOpen] = useState(false); // Estado para el modal de crear cámara
 
   const toggleDrawer = () => {
     setIsDrawerOpen(!isDrawerOpen);
@@ -19,6 +21,9 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
 
   const handleOpenDeleteModal = () => setIsDeleteModalOpen(true);
   const handleCloseDeleteModal = () => setIsDeleteModalOpen(false);
+
+  const handleOpenCreateCamaraModal = () => setIsCreateCamaraModalOpen(true); // Abrir modal de crear cámara
+  const handleCloseCreateCamaraModal = () => setIsCreateCamaraModalOpen(false); // Cerrar modal de crear cámara
 
   const handleControlCamarasClick = () => {
     onShowCameraControl();
@@ -53,6 +58,11 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
             Control de Cámaras
           </Button>
 
+          {/* Nuevo botón para crear cámara */}
+          <Button variant="contained" color="secondary" onClick={handleOpenCreateCamaraModal} sx={{ mt: 2, px: 6 }}>
+            Crear Cámara
+          </Button>
+
           <DvrCreateModal
             open={isCreateModalOpen}
             onClose={handleCloseCreateModal}
@@ -64,6 +74,12 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
             onClose={handleCloseDeleteModal}
             dvrs={dvrs}
             handleDelete={onDeleteDvr}
+          />
+
+          {/* Modal de crear cámara */}
+          <CreateCamaraModal
+            open={isCreateCamaraModalOpen}
+            onClose={handleCloseCreateCamaraModal}
           />
         </Box>
       </Drawer>
