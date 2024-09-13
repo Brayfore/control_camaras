@@ -1,3 +1,4 @@
+//BACKEND
 from django.db import models
 
 class Dvr(models.Model):
@@ -9,6 +10,23 @@ class Dvr(models.Model):
 
     def __str__(self):
         return f"{self.nombre} - {self.ubicacion}"
+
+class Camara(models.Model):
+    nombre = models.CharField(max_length=100)
+    dvr = models.ForeignKey(Dvr, related_name='camaras', on_delete=models.CASCADE)
+    puerto = models.PositiveIntegerField()
+    dvr_nombre = models.CharField(max_length=100)
+
+    class Meta:
+        unique_together = ('dvr', 'puerto')
+        
+    def save(self, *args, **kwargs):
+        self.dvr_nombre = self.dvr.nombre
+        super().save(*args, **kwargs)  # Asegura que cada puerto en un DVR tenga solo una cámara
+
+    def __str__(self):
+        return f"{self.nombre} - DVR: {self.dvr.nombre} - Puerto: {self.puerto}"
+
 
 class RegistroGrabacion(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
@@ -25,13 +43,13 @@ class RegistroGrabacion(models.Model):
     def __str__(self):
         return f"{self.fecha} - {self.dvr.nombre} - {self.dias_grabacion} días"
 
-
 from rest_framework import serializers
-from .models import Dvr, RegistroGrabacion
+from .models import Dvr, RegistroGrabacion, Camara  # Asegúrate de importar el modelo Camara
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 import pytz  # Para manejar zonas horarias
+
 # Serializadores para manejar el registro y la autenticación de usuarios
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -55,12 +73,31 @@ class UserSerializerWithToken(UserSerializer):
         refresh = RefreshToken.for_user(obj)
         return str(refresh.access_token)
 
-# Serializadores para manejar los modelos Dvr y RegistroGrabacion
+# Serializador para manejar el modelo Dvr
 class DvrSerializer(serializers.ModelSerializer):
     class Meta:
         model = Dvr
         fields = ('id', 'nombre', 'ip', 'capacidad', 'puertos', 'ubicacion')
 
+# Serializador para manejar el modelo Camara
+class CamaraSerializer(serializers.ModelSerializer):
+    dvr_nombre =serializers.CharField(source='dvr.nombre', read_only=True)
+    class Meta:
+        model = Camara
+        fields = ['id', 'nombre', 'dvr_nombre', 'puerto']
+
+    # Sobrescribir la validación    
+    def validate(self, data):
+        dvr = data.get('dvr')
+        puerto = data.get('puerto')
+
+        # Verificar si el puerto ya está en uso para este DVR
+        if Camara.objects.filter(dvr=dvr, puerto=puerto).exists():
+            raise serializers.ValidationError(f"El puerto {puerto} ya está en uso para este DVR.")
+
+        return data
+
+# Serializador para manejar el modelo RegistroGrabacion
 class RegistroGrabacionSerializer(serializers.ModelSerializer):
     dvr = serializers.PrimaryKeyRelatedField(queryset=Dvr.objects.all())
 
@@ -85,44 +122,16 @@ class RegistroGrabacionSerializer(serializers.ModelSerializer):
         data['fecha'] = fecha
         return data
 
-from rest_framework import viewsets, permissions, generics
-from django.contrib.auth.models import User
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .models import  Dvr, RegistroGrabacion
-from .serializers import ( DvrSerializer, RegistroGrabacionSerializer,   UserSerializerWithToken)
-
-# ViewSets existentes
-class DvrViewSet(viewsets.ModelViewSet):
-    queryset = Dvr.objects.all()
-    permission_classes = [permissions.AllowAny]
-    serializer_class = DvrSerializer
-
-class RegistroGrabacionViewSet(viewsets.ModelViewSet):
-    queryset = RegistroGrabacion.objects.all()
-    permission_classes = [permissions.AllowAny]
-    serializer_class = RegistroGrabacionSerializer
-
-# Nuevas vistas para manejo de autenticación
-class UserRegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializerWithToken
-    permission_classes = [permissions.AllowAny]
-
-class CustomTokenObtainPairView(TokenObtainPairView):
-    permission_classes = [permissions.AllowAny]
-
-class CustomTokenRefreshView(TokenRefreshView):
-    permission_classes = [permissions.AllowAny]
-
 # aplicacion_camara/urls.py
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from aplicacion_camara.api import  DvrViewSet, RegistroGrabacionViewSet, UserRegisterView, CustomTokenObtainPairView, CustomTokenRefreshView
+from aplicacion_camara.api import  DvrViewSet, RegistroGrabacionViewSet, CamaraViewSet, UserRegisterView, CustomTokenObtainPairView, CustomTokenRefreshView
 
 # Crea un router para manejar automáticamente las rutas de los viewsets.
 router = DefaultRouter()
 router.register(r'dvrs', DvrViewSet)  # Registra el viewset para Dvr.
-router.register(r'registros', RegistroGrabacionViewSet)  # Registra el viewset para RegistroGrabacion.
+router.register(r'registros', RegistroGrabacionViewSet) # Registra el viewset para RegistroGrabacion.
+router.register(r'camaras', CamaraViewSet)
 
 # Define las rutas de la aplicación incluyendo las rutas generadas por el router.
 urlpatterns = [
@@ -131,6 +140,8 @@ urlpatterns = [
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/ref resh/', CustomTokenRefreshView.as_view(), name='token_refresh'),  # Incluye todas las rutas registradas en el router.
 ]
+
+
 
 # Comentado: Ejemplo alternativo de cómo definir el router y las rutas.
 """"
@@ -145,28 +156,471 @@ urlpatterns = router.urls
 """
 # aplicacion_camara/urls.py
 
-"""
-URL configuration for verificacion_camara project.
+//FRONTEND
+import React, { useState, useEffect } from 'react';
+import { Box, Modal, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { fetchDvrs, fetchCamarasByDvr, createCamara } from '../services/apiService'; // Asegúrate de que los paths sean correctos
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
-from django.contrib import admin
-from django.urls import path, include
-# Definición de las rutas principales del proyecto.
-urlpatterns = [
-    path('admin/', admin.site.urls),  # Ruta para el panel de administración de Django.
-    path('', include('aplicacion_camara.urls')),  # Incluye las rutas definidas en el archivo urls.py de la aplicación 'aplicacion_camara'.
-]
-# verificacion_camara/urls.py
+const CreateCamaraModal = ({ open, onClose }) => {
+  const [dvrs, setDvrs] = useState([]);
+  const [selectedDvr, setSelectedDvr] = useState('');
+  const [camaraName, setCamaraName] = useState('');
+  const [puertosDisponibles, setPuertosDisponibles] = useState([]);
+  const [selectedPuerto, setSelectedPuerto] = useState('');
 
+  // Cargar todos los DVRs al cargar el componente
+// Cargar todos los DVRs al cargar el componente
+useEffect(() => {
+    const loadDvrs = async () => {
+      try {
+        const dvrData = await fetchDvrs();  // Esta llamada debería traer todos los DVRs
+        setDvrs(dvrData);  // Asegúrate de actualizar correctamente el estado con los DVRs
+      } catch (error) {
+        console.error('Error al cargar DVRs:', error);
+      }
+    };
+  
+    loadDvrs();
+  }, []);
+  
+  // Cargar las cámaras de un DVR específico para verificar los puertos ocupados
+  useEffect(() => {
+    const loadCamaras = async () => {
+      if (selectedDvr) {
+        try {
+          // Llamada a la API para obtener las cámaras del DVR seleccionado
+          const camaras = await fetchCamarasByDvr(selectedDvr);
+  
+          // Obtener los puertos ocupados por las cámaras asociadas al DVR seleccionado
+          const puertosOcupados = camaras.map(camara => camara.puerto);
+  
+          // Buscar el DVR seleccionado en la lista de DVRs y obtener su cantidad total de puertos
+          const dvrSeleccionado = dvrs.find(dvr => dvr.id === selectedDvr);
+          
+          // Asegurarse de que el DVR seleccionado exista y tenga puertos asignados
+          const totalPuertos = dvrSeleccionado ? dvrSeleccionado.puertos : 0;
+  
+          // Generar una lista de puertos disponibles excluyendo los ocupados
+          const puertosDisponibles = Array.from({ length: totalPuertos }, (_, i) => i + 1)
+            .filter(puerto => !puertosOcupados.includes(puerto));
+  
+          // Actualizar el estado con la lista de puertos disponibles
+          setPuertosDisponibles(puertosDisponibles);
+        } catch (error) {
+          console.error("Error al cargar las cámaras del DVR:", error);
+          // En caso de error, asegurarse de limpiar el estado para evitar datos corruptos
+          setPuertosDisponibles([]);
+        }
+      } else {
+        // Si no hay DVR seleccionado, limpiar los puertos disponibles
+        setPuertosDisponibles([]);
+      }
+    };
+  
+    loadCamaras();
+  }, [selectedDvr, dvrs]);
+  
+  
+
+  const handleCreateCamara = async () => {
+    try {
+      await createCamara({
+        nombre: camaraName,
+        dvr: selectedDvr, // ID del DVR
+        puerto: selectedPuerto // Puerto seleccionado
+      });
+      alert('Cámara creada exitosamente');
+      setCamaraName('');
+      setSelectedPuerto('');
+      onClose();
+    } catch (error) {
+      console.error('Error al crear la cámara:', error);
+      alert('Error al crear la cámara. Puede que el puerto ya esté en uso.');
+    }
+  };
+  
+  
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 2,
+        }}
+      >
+        <Typography variant="h6" gutterBottom>Crear Cámara</Typography>
+
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Seleccione un DVR</InputLabel>
+          <Select value={selectedDvr} onChange={(e) => setSelectedDvr(e.target.value)} label="Seleccione un DVR">
+            {dvrs.length > 0 ? (
+              dvrs.map((dvr) => (
+                <MenuItem key={dvr.id} value={dvr.id}>
+                  {dvr.nombre}
+                </MenuItem>
+              ))
+            ) : (
+              <MenuItem value="">No hay DVRs disponibles</MenuItem>
+            )}
+          </Select>
+        </FormControl>
+
+        <TextField
+          label="Nombre de la Cámara *"
+          value={camaraName}
+          onChange={(e) => setCamaraName(e.target.value)}
+          fullWidth
+          sx={{ mb: 2 }}
+        />
+
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Seleccione un Puerto</InputLabel>
+          <Select
+            value={selectedPuerto}
+            onChange={(e) => setSelectedPuerto(e.target.value)}
+            label="Seleccione un Puerto"
+          >
+            {puertosDisponibles.length > 0 ? (
+              puertosDisponibles.map((puerto) => (
+                <MenuItem key={puerto} value={puerto}>
+                  {puerto}
+                </MenuItem>
+              ))
+            ) : (
+              <MenuItem value="">No hay puertos disponibles</MenuItem>
+            )}
+          </Select>
+        </FormControl>
+
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          onClick={handleCreateCamara}
+          disabled={!selectedDvr || !camaraName || !selectedPuerto} // Deshabilita el botón si falta algún campo
+        >
+          CREAR CÁMARA
+        </Button>
+      </Box>
+    </Modal>
+  );
+};
+
+export default CreateCamaraModal;
+
+import React, { useEffect, useState } from 'react';
+import { Box, Typography } from '@mui/material';
+import { fetchDvrs, createDvr, deleteDvr, createRegistro } from '../services/apiService';
+import ProfileSidebar from './ProfileSidebar';
+import CameraTable from './CameraTable';
+import Swal from 'sweetalert2'
+import '../styles/CameraControlSystem.css';  // Importamos el archivo CSS
+
+const CameraControlSystem = () => {
+  const [dvrs, setDvrs] = useState([]);
+  const [showCameraControl, setShowCameraControl] = useState(false);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const dvrsData = await fetchDvrs();
+        setDvrs(dvrsData.map(dvr => ({
+          ...dvr,
+          diasGrabacion: '',
+          verificacionAM: false,
+          verificacionPM: false,
+          amDisabled: false,
+          pmDisabled: false,
+        })));
+      } catch (error) {
+        console.error('Failed to load DVRs:', error);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleEdit = (id, field, value) => {
+    setDvrs(prevDvrs => {
+      const updatedDvrs = prevDvrs.map(dvr => {
+        if (dvr.id === id) {
+          const updatedDvr = { ...dvr, [field]: value };
+  
+          if (field === 'fechaInicio' || field === 'fechaFinal') {
+            const { fechaInicio, fechaFinal } = updatedDvr;
+  
+            if (fechaInicio && fechaFinal) {
+              const startDate = new Date(fechaInicio);
+              const endDate = new Date(fechaFinal);
+              const daysOfRecording = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+  
+              if (daysOfRecording > 0) {
+                updatedDvr.diasGrabacion = daysOfRecording;
+              } else {
+                updatedDvr.diasGrabacion = 0;
+              }
+            }
+          }
+  
+          return updatedDvr;
+        }
+        return dvr;
+      });
+  
+      return updatedDvrs;
+    });
+  };
+  
+  
+  
+
+  const handleRegister = async (id) => {
+    const dvr = dvrs.find(dvr => dvr.id === id);
+  
+    // Verificar que al menos una verificación esté seleccionada
+    if (!dvr.verificacionAM && !dvr.verificacionPM) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Registro Incompleto',
+        text: 'Debe seleccionar al menos una verificación (AM o PM) para registrar.',
+      });
+      return;
+    }
+  
+    const registroData = {
+      dvr: id,
+      dias_grabacion: dvr.diasGrabacion,
+      verificacion_am: dvr.verificacionAM,
+      verificacion_pm: dvr.verificacionPM,
+      fecha_inicio: dvr.fechaInicio ? new Date(dvr.fechaInicio).toISOString().split('T')[0] : null,
+      fecha_final: dvr.fechaFinal ? new Date(dvr.fechaFinal).toISOString().split('T')[0] : null,
+    };
+  
+    try {
+      await createRegistro(registroData);
+      Swal.fire({
+        icon: 'success',
+        title: 'Registro Exitoso',
+        text: 'El registro se ha creado correctamente.',
+      });
+  
+      // Asegúrate de que las funciones de edición no causen un re-renderizado innecesario o problemas de diseño.
+      if (dvr.verificacionAM) {
+        handleEdit(id, 'amDisabled', true);
+        handleEdit(id, 'verificacionAM', false);
+      }
+  
+      if (dvr.verificacionPM) {
+        handleEdit(id, 'pmDisabled', true);
+        handleEdit(id, 'verificacionPM', false);
+      }
+      
+      // Podrías agregar un setState vacío para forzar un re-render sin afectar el diseño
+      setDvrs(prevDvrs => [...prevDvrs]);
+  
+    } catch (error) {
+      console.error('Error creando el registro:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Hubo un error al crear el registro.',
+      });
+    }
+  };
+  
+  
+  
+
+  const handleCreateDvr = async (newDvrData) => {
+    try {
+      const newDvr = await createDvr(newDvrData);
+      setDvrs([...dvrs, {
+        ...newDvr,
+        diasGrabacion: '',
+        verificacionAM: false,
+        verificacionPM: false,
+        amDisabled: false,
+        pmDisabled: false,
+      }]);
+    } catch (error) {
+      console.error('Error creating DVR:', error);
+    }
+  };
+
+  const handleDeleteDvr = async (id) => {
+    try {
+      await deleteDvr(id);
+      setDvrs(dvrs.filter(dvr => dvr.id !== id));
+    } catch (error) {
+      console.error('Error deleting DVR:', error);
+    }
+  };
+
+  const toggleContentVisibility = () => {
+    setShowCameraControl(true);
+  };
+
+  const username = localStorage.getItem('username');
+
+  return (
+    <Box className="camera-control-system">
+      <ProfileSidebar
+        username={username}
+        handleLogout={() => {
+          localStorage.removeItem('uid');
+          localStorage.removeItem('username');
+          window.location.href = '/';
+        }}
+        dvrs={dvrs}
+        onCreateDvr={handleCreateDvr}
+        onDeleteDvr={handleDeleteDvr}
+        onShowCameraControl={toggleContentVisibility}
+      />
+
+      <Box className="camera-control-content">
+        {showCameraControl ? (
+          <Box className="camera-table-wrapper">
+            <Typography variant="h4" gutterBottom sx={{ color: '#003366', textAlign: 'center' }}>
+              Control de Cámaras
+            </Typography>
+            <CameraTable
+              dvrs={dvrs}
+              handleEdit={handleEdit}
+              handleRegister={handleRegister}
+            />
+          </Box>
+        ) : (
+          <Typography
+            variant="h4"
+            gutterBottom
+            className="welcome-message"
+          >
+            Bienvenido al Control de Cámaras
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+export default CameraControlSystem;
+
+import axios from 'axios';
+
+const API_URL = 'http://127.0.0.1:8000/api';
+
+// Crea una instancia de Axios para configurar la base URL si es necesario
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Función para obtener las cámaras de un DVR específico
+export const fetchCamarasByDvr = async (dvrId) => {
+  try {
+    const response = await api.get(`/camaras/?dvr=${dvrId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching camaras:', error);
+    throw error;
+  }
+};
+
+
+// Función para obtener la lista de DVRs
+export const fetchDvrs = async () => {
+  try {
+    const response = await api.get('/dvrs/');
+    console.log(response);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching DVRs:', error);
+    throw error;
+  }
+};
+
+// Función para crear un nuevo DVR
+export const createDvr = async (dvrData) => {
+  try {
+    const response = await api.post('/dvrs/', dvrData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating DVR:', error);
+    throw error;
+  }
+};
+
+// Función para eliminar DVR
+export const deleteDvr = async (dvrId) => {
+  try {
+    await api.delete(`/dvrs/${dvrId}/`);
+  } catch (error) {
+    console.error('Error deleting DVR:', error);
+    throw error;
+  }
+};
+
+// Función para obtener registros
+export const fetchRegistros = async () => {
+  try {
+    const response = await api.get('/registros/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching registros:', error);
+    throw error;
+  }
+};
+
+// Función para crear un registro
+export const createRegistro = async (registroData) => {
+  try {
+    const response = await api.post('/registros/', registroData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating registro:', error);
+    throw error;
+  }
+};
+
+// Función para obtener la lista de Cámaras
+export const fetchCamaras = async () => {
+  try {
+    const response = await api.get('/camaras/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching camaras:', error);
+    throw error;
+  }
+};
+
+// Función para crear una nueva Cámara
+export const createCamara = async (camaraData) => {
+  try {
+    const response = await api.post('/camaras/', camaraData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating camara:', error);
+    throw error;
+  }
+};
+
+// Función para eliminar una Cámara
+export const deleteCamara = async (camaraId) => {
+  try {
+    await api.delete(`/camaras/${camaraId}/`);
+  } catch (error) {
+    console.error('Error deleting camara:', error);
+    throw error;
+  }
+};
+
+export default api;

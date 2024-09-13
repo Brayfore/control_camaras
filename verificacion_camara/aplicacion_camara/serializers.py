@@ -36,21 +36,30 @@ class DvrSerializer(serializers.ModelSerializer):
 
 # Serializador para manejar el modelo Camara
 class CamaraSerializer(serializers.ModelSerializer):
-    dvr_nombre =serializers.CharField(source='dvr.nombre', read_only=True)
+    dvr_nombre = serializers.CharField(source='dvr.nombre', read_only=True)
+    
     class Meta:
         model = Camara
-        fields = ['id', 'nombre', 'dvr_nombre', 'puerto']
+        fields = ['id', 'nombre', 'dvr', 'dvr_nombre', 'puerto']  # Asegúrate de incluir 'dvr' en los campos
 
-    # Sobrescribir la validación    
+    # Validación general del DVR y el puerto
     def validate(self, data):
         dvr = data.get('dvr')
         puerto = data.get('puerto')
 
-        # Verificar si el puerto ya está en uso para este DVR
+        # Verificar que el DVR sea válido y exista en la base de datos
+        if not Dvr.objects.filter(id=dvr.id).exists():
+            raise serializers.ValidationError("El DVR seleccionado no es válido.")
+
+        # Verifica si el puerto ya está en uso para el DVR seleccionado
         if Camara.objects.filter(dvr=dvr, puerto=puerto).exists():
             raise serializers.ValidationError(f"El puerto {puerto} ya está en uso para este DVR.")
 
+        # Log para depuración
+        print(f"Validando puerto {puerto} para DVR {dvr}")
+
         return data
+
 
 # Serializador para manejar el modelo RegistroGrabacion
 class RegistroGrabacionSerializer(serializers.ModelSerializer):
@@ -63,7 +72,11 @@ class RegistroGrabacionSerializer(serializers.ModelSerializer):
     def validate(self, data):
         dvr = data.get('dvr')
         fecha = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
-        
+
+        # Verificación PM: No se puede hacer una verificación PM antes de las 12 p.m.
+        if data.get('verificacion_pm') and fecha.hour < 12:
+            raise serializers.ValidationError("No se puede hacer una verificación PM antes de las 12 p.m.")
+
         # Verificar si ya existe una verificación AM para esta fecha y DVR
         if data.get('verificacion_am'):
             if RegistroGrabacion.objects.filter(dvr=dvr, fecha__date=fecha.date(), verificacion_am=True).exists():

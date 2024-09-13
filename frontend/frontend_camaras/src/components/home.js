@@ -3,8 +3,9 @@ import { Box, Typography } from '@mui/material';
 import { fetchDvrs, createDvr, deleteDvr, createRegistro } from '../services/apiService';
 import ProfileSidebar from './ProfileSidebar';
 import CameraTable from './CameraTable';
-import Swal from 'sweetalert2'
+import Swal from 'sweetalert2';
 import '../styles/CameraControlSystem.css';  // Importamos el archivo CSS
+import imagenBienvenida from '../assets/imagenBienvenida-removebg.png'; // Asegúrate de tener esta imagen en la carpeta correcta
 
 const CameraControlSystem = () => {
   const [dvrs, setDvrs] = useState([]);
@@ -59,9 +60,6 @@ const CameraControlSystem = () => {
       return updatedDvrs;
     });
   };
-  
-  
-  
 
   const handleRegister = async (id) => {
     const dvr = dvrs.find(dvr => dvr.id === id);
@@ -93,7 +91,6 @@ const CameraControlSystem = () => {
         text: 'El registro se ha creado correctamente.',
       });
   
-      // Asegúrate de que las funciones de edición no causen un re-renderizado innecesario o problemas de diseño.
       if (dvr.verificacionAM) {
         handleEdit(id, 'amDisabled', true);
         handleEdit(id, 'verificacionAM', false);
@@ -104,7 +101,6 @@ const CameraControlSystem = () => {
         handleEdit(id, 'verificacionPM', false);
       }
       
-      // Podrías agregar un setState vacío para forzar un re-render sin afectar el diseño
       setDvrs(prevDvrs => [...prevDvrs]);
   
     } catch (error) {
@@ -116,9 +112,6 @@ const CameraControlSystem = () => {
       });
     }
   };
-  
-  
-  
 
   const handleCreateDvr = async (newDvrData) => {
     try {
@@ -179,13 +172,22 @@ const CameraControlSystem = () => {
             />
           </Box>
         ) : (
-          <Typography
-            variant="h4"
-            gutterBottom
-            className="welcome-message"
-          >
-            Bienvenido al Control de Cámaras
-          </Typography>
+          <Box sx={{ textAlign: 'center', marginTop: '20px' }}>
+            <Typography
+              variant="h4"
+              gutterBottom
+              className="welcome-message"
+            >
+              Bienvenido al Control de Cámaras
+            </Typography>
+
+            {/* Aquí colocamos la imagen debajo del título */}
+            <img 
+              src={imagenBienvenida} 
+              alt="Control de Cámaras"
+              style={{ width: '400%', maxWidth: '400px', height: 'auto', marginTop: '20px', marginBottom: '20px' }} 
+            />
+          </Box>
         )}
       </Box>
     </Box>

@@ -1,0 +1,962 @@
+import React from 'react';
+import { Box, Typography, TextField, Button, Checkbox } from '@mui/material';
+import '../styles/CameraForm.css';  // Importamos el archivo CSS
+
+const CameraForm = ({ newCamera, handleInputChange, handleCheckboxChange, handleSubmit, editId }) => (
+  <Box className="camera-form">
+    <Typography variant="h6" gutterBottom>Registrar Verificación</Typography>
+    <Box component="form" onSubmit={handleSubmit} className="form-grid">
+      <TextField
+        label="Días de Grabación"
+        name="diasGrabacion"
+        value={newCamera.diasGrabacion || ''}
+        onChange={handleInputChange}
+        type="number"
+        fullWidth
+      />
+      <Box className="checkbox-container">
+        <Checkbox
+          checked={newCamera.verificacionAM || false}
+          onChange={() => handleCheckboxChange('verificacionAM')}
+        />
+        <Typography>Verificación AM</Typography>
+      </Box>
+      <Box className="checkbox-container">
+        <Checkbox
+          checked={newCamera.verificacionPM || false}
+          onChange={() => handleCheckboxChange('verificacionPM')}
+        />
+        <Typography>Verificación PM</Typography>
+      </Box>
+      <Button type="submit" variant="contained" color="primary" fullWidth>
+        {editId ? 'Actualizar' : 'Registrar'}
+      </Button>
+    </Box>
+  </Box>
+);
+
+export default CameraForm;
+
+import React, { useState } from "react";
+import {
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Checkbox,
+  TextField,
+  Button,
+} from "@mui/material";
+import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
+import "../styles/CameraTable.css";
+
+const CameraTable = ({ dvrs, handleEdit, handleRegister }) => {
+  const [page, setPage] = useState(0); // Estado para la página actual
+  const rowsPerPage = 9; // Número de filas a mostrar por página
+
+  const handleChangePage = (newPage) => {
+    setPage(newPage);
+  };
+
+  const paginatedDvrs = dvrs.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Box className="camera-table-container">
+        <TableContainer component={Paper} className="table-container">
+          <Table>
+            <TableHead className="table-head">
+              <TableRow>
+                {[
+                  "Fecha",
+                  "DVR",
+                  "Ubicación",
+                  "Días de Grabación",
+                  "Fecha de Inicio",
+                  "Fecha Final",
+                  "Verificación AM",
+                  "Verificación PM",
+                  "Acciones",
+                ].map((header) => (
+                  <TableCell key={header} className="table-cell-header">
+                    {header}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {paginatedDvrs.map((dvr) => (
+                <TableRow key={dvr.id} className="table-row">
+                  <TableCell className="table-cell">
+                    {new Date().toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="table-cell">{dvr.nombre}</TableCell>
+                  <TableCell className="table-cell">{dvr.ubicacion}</TableCell>
+                  <TableCell className="table-cell">
+                    <TextField
+                      type="number"
+                      name="diasGrabacion"
+                      value={dvr.diasGrabacion || ""}
+                      onChange={(e) =>
+                        handleEdit(dvr.id, "diasGrabacion", e.target.value)
+                      }
+                      className="text-field"
+                      variant="outlined"
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell className="table-cell">
+                    <DatePicker
+                      label=""
+                      value={dvr.fechaInicio || null}
+                      onChange={(date) =>
+                        handleEdit(dvr.id, "fechaInicio", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          variant: "outlined",
+                          size: "small",
+                          fullWidth: true,
+                        },
+                      }}
+                    />
+                  </TableCell>
+                  <TableCell className="table-cell">
+                    <DatePicker
+                      label=""
+                      value={dvr.fechaFinal || null}
+                      onChange={(date) =>
+                        handleEdit(dvr.id, "fechaFinal", date)
+                      }
+                      slotProps={{
+                        textField: {
+                          variant: "outlined",
+                          size: "small",
+                          fullWidth: true,
+                        },
+                      }}
+                    />
+                  </TableCell>
+
+                  <TableCell className="table-cell">
+                    <Checkbox
+                      checked={dvr.verificacionAM || false}
+                      onChange={(e) =>
+                        handleEdit(dvr.id, "verificacionAM", e.target.checked)
+                      }
+                      className="checkbox"
+                      disabled={dvr.amDisabled}
+                    />
+                  </TableCell>
+                  <TableCell className="table-cell">
+                    <Checkbox
+                      checked={dvr.verificacionPM || false}
+                      onChange={(e) =>
+                        handleEdit(dvr.id, "verificacionPM", e.target.checked)
+                      }
+                      className="checkbox"
+                      disabled={dvr.pmDisabled}
+                    />
+                  </TableCell>
+                  <TableCell className="table-cell">
+                    <Button
+                      variant="contained"
+                      onClick={() => handleRegister(dvr.id)}
+                      className="register-button"
+                      startIcon={<AssignmentTurnedInIcon />}
+                    >
+                      Registrar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          <div className="pagination">
+            <Button
+              onClick={() => handleChangePage(page - 1)}
+              disabled={page === 0}
+              className="pagination-button"
+            >
+              Anterior
+            </Button>
+            <Button
+              onClick={() => handleChangePage(page + 1)}
+              disabled={page >= Math.ceil(dvrs.length / rowsPerPage) - 1}
+              className="pagination-button"
+            >
+              Siguiente
+            </Button>
+          </div>
+        </TableContainer>
+      </Box>
+    </LocalizationProvider>
+  );
+};
+
+export default CameraTable;
+
+import React, { useState, useEffect } from 'react';
+import { Box, Modal, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { fetchDvrs, fetchCamarasByDvr, createCamara } from '../services/apiService'; // Asegúrate de que los paths sean correctos
+
+const CreateCamaraModal = ({ open, onClose }) => {
+  const [dvrs, setDvrs] = useState([]);
+  const [selectedDvr, setSelectedDvr] = useState('');
+  const [camaraName, setCamaraName] = useState('');
+  const [puertosDisponibles, setPuertosDisponibles] = useState([]);
+  const [selectedPuerto, setSelectedPuerto] = useState('');
+
+  // Cargar todos los DVRs al cargar el componente
+// Cargar todos los DVRs al cargar el componente
+useEffect(() => {
+    const loadDvrs = async () => {
+      try {
+        const dvrData = await fetchDvrs();  // Esta llamada debería traer todos los DVRs
+        setDvrs(dvrData);  // Asegúrate de actualizar correctamente el estado con los DVRs
+      } catch (error) {
+        console.error('Error al cargar DVRs:', error);
+      }
+    };
+  
+    loadDvrs();
+  }, []);
+  
+  // Cargar las cámaras de un DVR específico para verificar los puertos ocupados
+  useEffect(() => {
+    if (selectedDvr) {
+      const loadCamaras = async () => {
+        const camaras = await fetchCamarasByDvr(selectedDvr);
+  
+        // Obtener los puertos ocupados de las cámaras asociadas a este DVR
+        const puertosOcupados = camaras.map(camara => camara.puerto);
+  
+        // Generar la lista de puertos disponibles en base al número total de puertos del DVR y los ocupados
+        const dvrSeleccionado = dvrs.find(dvr => dvr.id === selectedDvr);
+        const totalPuertos = dvrSeleccionado ? dvrSeleccionado.puertos : 0;
+  
+        // Asegurarse de que solo se muestren puertos no ocupados
+        const puertosDisponibles = Array.from({ length: totalPuertos }, (_, i) => i + 1).filter(puerto => !puertosOcupados.includes(puerto));
+  
+        setPuertosDisponibles(puertosDisponibles);
+      };
+      loadCamaras();
+    }
+  }, [selectedDvr, dvrs]);
+  
+
+  const handleCreateCamara = async () => {
+    try {
+      await createCamara({ nombre: camaraName, dvr: selectedDvr, puerto: selectedPuerto });
+      alert('Cámara creada exitosamente');
+      setCamaraName('');
+      setSelectedPuerto('');
+      onClose(); // Cerrar el modal
+    } catch (error) {
+      console.error('Error al crear la cámara:', error);
+      alert('Error al crear la cámara. Puede que el puerto ya esté en uso.');
+    }
+  };
+  
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Box
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 2,
+        }}
+      >
+        <Typography variant="h6" gutterBottom>Crear Cámara</Typography>
+
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Seleccione un DVR</InputLabel>
+          <Select value={selectedDvr} onChange={(e) => setSelectedDvr(e.target.value)} label="Seleccione un DVR">
+            {dvrs.length > 0 ? (
+              dvrs.map((dvr) => (
+                <MenuItem key={dvr.id} value={dvr.id}>
+                  {dvr.nombre}
+                </MenuItem>
+              ))
+            ) : (
+              <MenuItem value="">No hay DVRs disponibles</MenuItem>
+            )}
+          </Select>
+        </FormControl>
+
+        <TextField
+          label="Nombre de la Cámara *"
+          value={camaraName}
+          onChange={(e) => setCamaraName(e.target.value)}
+          fullWidth
+          sx={{ mb: 2 }}
+        />
+
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel>Seleccione un Puerto</InputLabel>
+          <Select
+            value={selectedPuerto}
+            onChange={(e) => setSelectedPuerto(e.target.value)}
+            label="Seleccione un Puerto"
+          >
+            {puertosDisponibles.length > 0 ? (
+              puertosDisponibles.map((puerto) => (
+                <MenuItem key={puerto} value={puerto}>
+                  {puerto}
+                </MenuItem>
+              ))
+            ) : (
+              <MenuItem value="">No hay puertos disponibles</MenuItem>
+            )}
+          </Select>
+        </FormControl>
+
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          onClick={handleCreateCamara}
+          disabled={!selectedDvr || !camaraName || !selectedPuerto} // Deshabilita el botón si falta algún campo
+        >
+          CREAR CÁMARA
+        </Button>
+      </Box>
+    </Modal>
+  );
+};
+
+export default CreateCamaraModal;
+
+import React, { useState } from 'react';
+import { Box, Modal, Typography, Button, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import '../styles/DeleteDvrModal.css';  // Importamos el archivo CSS
+
+const DeleteDvrModal = ({ open, onClose, dvrs, handleDelete }) => {
+  const [selectedDvr, setSelectedDvr] = useState('');
+
+  const handleSelectChange = (event) => {
+    setSelectedDvr(event.target.value);
+  };
+
+  const handleDeleteClick = () => {
+    handleDelete(selectedDvr);
+    setSelectedDvr('');  // Reiniciar el valor seleccionado después de la eliminación
+    onClose(); // Cerrar el modal
+  };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Box className="delete-dvr-modal">
+        <Typography variant="h6" gutterBottom>Eliminar DVR</Typography>
+        <FormControl fullWidth sx={{ mt: 2 }}>
+          <InputLabel id="select-dvr-label">Seleccione un DVR</InputLabel>
+          <Select
+            labelId="select-dvr-label"
+            value={selectedDvr}
+            onChange={handleSelectChange}
+            label="Seleccione un DVR"
+          >
+            {dvrs.map((dvr) => (
+              <MenuItem key={dvr.id} value={dvr.id}>
+                {dvr.nombre}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <Button
+          variant="contained"
+          color="error"
+          fullWidth
+          onClick={handleDeleteClick}
+          sx={{ mt: 2}}
+          disabled={!selectedDvr}  // Desactivar botón si no hay DVR seleccionado
+        >
+          Eliminar DVR
+        </Button>
+      </Box>
+    </Modal>
+  );
+};
+
+export default DeleteDvrModal;
+
+import React, { useState } from 'react';
+import { Box, Modal, TextField, Button, Typography } from '@mui/material';
+
+const DvrCreateModal = ({ open, onClose, onCreate }) => {
+  const [formData, setFormData] = useState({
+    nombre: '',
+    ip: '',
+    capacidad: '',
+    puertos: '',
+    ubicacion: '',
+  });
+
+  const [error, setError] = useState(null);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const newDvr = await onCreate(formData);
+      setFormData({
+        nombre: '',
+        ip: '',
+        capacidad: '',
+        puertos: '',
+        ubicacion: '',
+      });
+      onClose();
+    } catch (error) {
+      setError('DVR CREADO CORRECTAMENTE.');
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 2,
+        }}
+      >
+        <Typography variant="h6" gutterBottom>Registrar DVR</Typography>
+        {error && <Typography color="green" gutterBottom>{error}</Typography>}
+        <TextField
+          label="Nombre"
+          name="nombre"
+          value={formData.nombre}
+          onChange={handleChange}
+          fullWidth
+          required
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="IP"
+          name="ip"
+          value={formData.ip}
+          onChange={handleChange}
+          fullWidth
+          required
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Almacenamiento"
+          name="capacidad" //Capacidad se refiere a almacenamiento
+          value={formData.capacidad}
+          onChange={handleChange}
+          fullWidth
+          required
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Puertos"
+          name="puertos"
+          value={formData.puertos}
+          onChange={handleChange}
+          fullWidth
+          required
+          sx={{ mb: 2 }}
+        />
+        <TextField
+          label="Ubicación"
+          name="ubicacion"
+          value={formData.ubicacion}
+          onChange={handleChange}
+          fullWidth
+          required
+          sx={{ mb: 2 }}
+        />
+        <Button variant="contained" color="primary" type="submit" fullWidth>
+          Registrar
+        </Button>
+      </Box>
+    </Modal>
+  );
+};
+
+export default DvrCreateModal;
+
+import React, { useEffect, useState } from 'react';
+import { Box, Typography } from '@mui/material';
+import { fetchDvrs, createDvr, deleteDvr, createRegistro } from '../services/apiService';
+import ProfileSidebar from './ProfileSidebar';
+import CameraTable from './CameraTable';
+import Swal from 'sweetalert2'
+import '../styles/CameraControlSystem.css';  // Importamos el archivo CSS
+
+const CameraControlSystem = () => {
+  const [dvrs, setDvrs] = useState([]);
+  const [showCameraControl, setShowCameraControl] = useState(false);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const dvrsData = await fetchDvrs();
+        setDvrs(dvrsData.map(dvr => ({
+          ...dvr,
+          diasGrabacion: '',
+          verificacionAM: false,
+          verificacionPM: false,
+          amDisabled: false,
+          pmDisabled: false,
+        })));
+      } catch (error) {
+        console.error('Failed to load DVRs:', error);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleEdit = (id, field, value) => {
+    setDvrs(prevDvrs => {
+      const updatedDvrs = prevDvrs.map(dvr => {
+        if (dvr.id === id) {
+          const updatedDvr = { ...dvr, [field]: value };
+  
+          if (field === 'fechaInicio' || field === 'fechaFinal') {
+            const { fechaInicio, fechaFinal } = updatedDvr;
+  
+            if (fechaInicio && fechaFinal) {
+              const startDate = new Date(fechaInicio);
+              const endDate = new Date(fechaFinal);
+              const daysOfRecording = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+  
+              if (daysOfRecording > 0) {
+                updatedDvr.diasGrabacion = daysOfRecording;
+              } else {
+                updatedDvr.diasGrabacion = 0;
+              }
+            }
+          }
+  
+          return updatedDvr;
+        }
+        return dvr;
+      });
+  
+      return updatedDvrs;
+    });
+  };
+  
+  
+  
+
+  const handleRegister = async (id) => {
+    const dvr = dvrs.find(dvr => dvr.id === id);
+  
+    // Verificar que al menos una verificación esté seleccionada
+    if (!dvr.verificacionAM && !dvr.verificacionPM) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Registro Incompleto',
+        text: 'Debe seleccionar al menos una verificación (AM o PM) para registrar.',
+      });
+      return;
+    }
+  
+    const registroData = {
+      dvr: id,
+      dias_grabacion: dvr.diasGrabacion,
+      verificacion_am: dvr.verificacionAM,
+      verificacion_pm: dvr.verificacionPM,
+      fecha_inicio: dvr.fechaInicio ? new Date(dvr.fechaInicio).toISOString().split('T')[0] : null,
+      fecha_final: dvr.fechaFinal ? new Date(dvr.fechaFinal).toISOString().split('T')[0] : null,
+    };
+  
+    try {
+      await createRegistro(registroData);
+      Swal.fire({
+        icon: 'success',
+        title: 'Registro Exitoso',
+        text: 'El registro se ha creado correctamente.',
+      });
+  
+      // Asegúrate de que las funciones de edición no causen un re-renderizado innecesario o problemas de diseño.
+      if (dvr.verificacionAM) {
+        handleEdit(id, 'amDisabled', true);
+        handleEdit(id, 'verificacionAM', false);
+      }
+  
+      if (dvr.verificacionPM) {
+        handleEdit(id, 'pmDisabled', true);
+        handleEdit(id, 'verificacionPM', false);
+      }
+      
+      // Podrías agregar un setState vacío para forzar un re-render sin afectar el diseño
+      setDvrs(prevDvrs => [...prevDvrs]);
+  
+    } catch (error) {
+      console.error('Error creando el registro:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Hubo un error al crear el registro.',
+      });
+    }
+  };
+  
+  
+  
+
+  const handleCreateDvr = async (newDvrData) => {
+    try {
+      const newDvr = await createDvr(newDvrData);
+      setDvrs([...dvrs, {
+        ...newDvr,
+        diasGrabacion: '',
+        verificacionAM: false,
+        verificacionPM: false,
+        amDisabled: false,
+        pmDisabled: false,
+      }]);
+    } catch (error) {
+      console.error('Error creating DVR:', error);
+    }
+  };
+
+  const handleDeleteDvr = async (id) => {
+    try {
+      await deleteDvr(id);
+      setDvrs(dvrs.filter(dvr => dvr.id !== id));
+    } catch (error) {
+      console.error('Error deleting DVR:', error);
+    }
+  };
+
+  const toggleContentVisibility = () => {
+    setShowCameraControl(true);
+  };
+
+  const username = localStorage.getItem('username');
+
+  return (
+    <Box className="camera-control-system">
+      <ProfileSidebar
+        username={username}
+        handleLogout={() => {
+          localStorage.removeItem('uid');
+          localStorage.removeItem('username');
+          window.location.href = '/';
+        }}
+        dvrs={dvrs}
+        onCreateDvr={handleCreateDvr}
+        onDeleteDvr={handleDeleteDvr}
+        onShowCameraControl={toggleContentVisibility}
+      />
+
+      <Box className="camera-control-content">
+        {showCameraControl ? (
+          <Box className="camera-table-wrapper">
+            <Typography variant="h4" gutterBottom sx={{ color: '#003366', textAlign: 'center' }}>
+              Control de Cámaras
+            </Typography>
+            <CameraTable
+              dvrs={dvrs}
+              handleEdit={handleEdit}
+              handleRegister={handleRegister}
+            />
+          </Box>
+        ) : (
+          <Typography
+            variant="h4"
+            gutterBottom
+            className="welcome-message"
+          >
+            Bienvenido al Control de Cámaras
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+export default CameraControlSystem;
+
+import React, { useState } from 'react';
+import { Box, Drawer, Typography, Button, IconButton } from '@mui/material';
+import { Logout as LogoutIcon, Menu as MenuIcon } from '@mui/icons-material';
+import DvrCreateModal from './DvrCreateModal';
+import DeleteDvrModal from './DeleteDvrModal';
+import CreateCamaraModal from './CreateCamaraModal'; // Importamos el modal para crear cámaras
+import '../styles/ProfileSidebar.css';  // Importamos el archivo CSS
+
+const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr, onShowCameraControl }) => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isCreateCamaraModalOpen, setIsCreateCamaraModalOpen] = useState(false); // Estado para el modal de crear cámara
+
+  const toggleDrawer = () => {
+    setIsDrawerOpen(!isDrawerOpen);
+  };
+
+  const handleOpenCreateModal = () => setIsCreateModalOpen(true);
+  const handleCloseCreateModal = () => setIsCreateModalOpen(false);
+
+  const handleOpenDeleteModal = () => setIsDeleteModalOpen(true);
+  const handleCloseDeleteModal = () => setIsDeleteModalOpen(false);
+
+  const handleOpenCreateCamaraModal = () => setIsCreateCamaraModalOpen(true); // Abrir modal de crear cámara
+  const handleCloseCreateCamaraModal = () => setIsCreateCamaraModalOpen(false); // Cerrar modal de crear cámara
+
+  const handleControlCamarasClick = () => {
+    onShowCameraControl();
+    setIsDrawerOpen(false);  // Cierra el menú después de hacer clic en "Control de Cámaras"
+  };
+
+  return (
+    <>
+      <Drawer
+        anchor="left"
+        open={isDrawerOpen}
+        onClose={toggleDrawer}
+        sx={{ '& .MuiDrawer-paper': { width: { xs: '100%', md: '300px' } } }}
+      >
+        <Box className="profile-sidebar">
+          <Typography variant="h6" gutterBottom>Perfil</Typography>
+          <Typography variant="body1" gutterBottom>Usuario: {username || 'No disponible'}</Typography>
+
+          <Button variant="contained" color="error" onClick={handleLogout} startIcon={<LogoutIcon />} sx={{ mt: 2, px: 7}}>
+            Cerrar sesión
+          </Button>
+
+          <Button variant="contained" color="primary" onClick={handleOpenCreateModal} sx={{ mt: 2, px: 11}}>
+            Crear DVR
+          </Button>
+
+          <Button variant="contained" color="primary" onClick={handleOpenDeleteModal} sx={{ mt: 2, px: 10 }}>
+            Eliminar DVR
+          </Button>
+
+          <Button variant="contained" color="primary" onClick={handleControlCamarasClick} sx={{ mt: 2, px: 6 }}>
+            Control de Cámaras
+          </Button>
+
+          {/* Nuevo botón para crear cámara */}
+          <Button variant="contained" color="secondary" onClick={handleOpenCreateCamaraModal} sx={{ mt: 2, px: 6 }}>
+            Crear Cámara
+          </Button>
+
+          <DvrCreateModal
+            open={isCreateModalOpen}
+            onClose={handleCloseCreateModal}
+            onCreate={onCreateDvr}
+          />
+
+          <DeleteDvrModal
+            open={isDeleteModalOpen}
+            onClose={handleCloseDeleteModal}
+            dvrs={dvrs}
+            handleDelete={onDeleteDvr}
+          />
+
+          {/* Modal de crear cámara */}
+          <CreateCamaraModal
+            open={isCreateCamaraModalOpen}
+            onClose={handleCloseCreateCamaraModal}
+          />
+        </Box>
+      </Drawer>
+
+      <IconButton onClick={toggleDrawer} sx={{ position: 'fixed', top: 16, left: 16, zIndex: 1200 }}>
+        <MenuIcon sx={{ color: 'blue' }} />
+      </IconButton>
+    </>
+  );
+};
+
+export default ProfileSidebar;
+
+import axios from 'axios';
+
+const API_URL = 'http://127.0.0.1:8000/api';
+
+// Crea una instancia de Axios para configurar la base URL si es necesario
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Función para obtener las cámaras de un DVR específico
+export const fetchCamarasByDvr = async (dvrId) => {
+  try {
+    const response = await api.get(`/camaras/?dvr=${dvrId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching camaras:', error);
+    throw error;
+  }
+};
+
+
+// Función para obtener la lista de DVRs
+export const fetchDvrs = async () => {
+  try {
+    const response = await api.get('/dvrs/');
+    console.log(response);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching DVRs:', error);
+    throw error;
+  }
+};
+
+// Función para crear un nuevo DVR
+export const createDvr = async (dvrData) => {
+  try {
+    const response = await api.post('/dvrs/', dvrData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating DVR:', error);
+    throw error;
+  }
+};
+
+// Función para eliminar DVR
+export const deleteDvr = async (dvrId) => {
+  try {
+    await api.delete(`/dvrs/${dvrId}/`);
+  } catch (error) {
+    console.error('Error deleting DVR:', error);
+    throw error;
+  }
+};
+
+// Función para obtener registros
+export const fetchRegistros = async () => {
+  try {
+    const response = await api.get('/registros/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching registros:', error);
+    throw error;
+  }
+};
+
+// Función para crear un registro
+export const createRegistro = async (registroData) => {
+  try {
+    const response = await api.post('/registros/', registroData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating registro:', error);
+    throw error;
+  }
+};
+
+// Función para obtener la lista de Cámaras
+export const fetchCamaras = async () => {
+  try {
+    const response = await api.get('/camaras/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching camaras:', error);
+    throw error;
+  }
+};
+
+// Función para crear una nueva Cámara
+export const createCamara = async (camaraData) => {
+  try {
+    const response = await api.post('/camaras/', camaraData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating camara:', error);
+    throw error;
+  }
+};
+
+// Función para eliminar una Cámara
+export const deleteCamara = async (camaraId) => {
+  try {
+    await api.delete(`/camaras/${camaraId}/`);
+  } catch (error) {
+    console.error('Error deleting camara:', error);
+    throw error;
+  }
+};
+
+export default api;
+
+import axios from 'axios';
+
+const axiosInstance = axios.create({
+  baseURL: 'http://127.0.0.1:8000/api',
+  timeout: 5000,
+  headers: {
+    'Content-Type': 'application/json',
+    accept: 'application/json',
+  },
+});
+
+export default axiosInstance;
+
+// src/routes/AppRoutes.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './screens/login';
+import CameraControlSystem from './components/home'
+import ProtectedRoute from './routes/ProtectedRoute';
+
+const AppRoutes = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/home"
+          element={
+            <ProtectedRoute>
+              <CameraControlSystem/>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+    </Router>
+  );
+};
+
+export default AppRoutes;
+// src/routes/AppRoutes.js
+// src/App.js
+// src/App.js
+// src/App.js
+

@@ -59,7 +59,7 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
           </Button>
 
           {/* Nuevo botón para crear cámara */}
-          <Button variant="contained" color="secondary" onClick={handleOpenCreateCamaraModal} sx={{ mt: 2, px: 6 }}>
+          <Button variant="contained" color="primary" onClick={handleOpenCreateCamaraModal} sx={{ mt: 2, px: 9 }}>
             Crear Cámara
           </Button>
 
@@ -85,7 +85,7 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
       </Drawer>
 
       <IconButton onClick={toggleDrawer} sx={{ position: 'fixed', top: 16, left: 16, zIndex: 1200 }}>
-        <MenuIcon sx={{ color: 'blue' }} />
+        <MenuIcon sx={{ color: 'orange' }} />
       </IconButton>
     </>
   );
