@@ -79,6 +79,7 @@ const CameraControlSystem = () => {
       dias_grabacion: dvr.diasGrabacion,
       verificacion_am: dvr.verificacionAM,
       verificacion_pm: dvr.verificacionPM,
+      observacion: dvr.observacion,
       fecha_inicio: dvr.fechaInicio ? new Date(dvr.fechaInicio).toISOString().split('T')[0] : null,
       fecha_final: dvr.fechaFinal ? new Date(dvr.fechaFinal).toISOString().split('T')[0] : null,
     };
