@@ -50,10 +50,6 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
             Crear DVR
           </Button>
 
-          <Button variant="contained" color="primary" onClick={handleOpenDeleteModal} sx={{ mt: 2, px: 10 }}>
-            Eliminar DVR
-          </Button>
-
           <Button variant="contained" color="primary" onClick={handleControlCamarasClick} sx={{ mt: 2, px: 6 }}>
             Control de Cámaras
           </Button>

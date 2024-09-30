@@ -82,8 +82,12 @@ WSGI_APPLICATION = 'verificacion_camara.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'control_de_camaras',  # El nombre de la base de datos que crearás en MySQL
+        'USER': 'root',  # El usuario de MySQL, por defecto es root en XAMPP
+        'PASSWORD': '',  # La contraseña de MySQL, por defecto es vacío en XAMPP
+        'HOST': 'localhost',  # Dirección de MySQL, usa localhost si está en tu máquina
+        'PORT': '3306',  # El puerto de MySQL, por defecto es 3306      
     }
 }
 

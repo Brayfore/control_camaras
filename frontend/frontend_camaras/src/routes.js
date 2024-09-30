@@ -1,42 +1,30 @@
-// AppRoutes.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Login from './screens/login';
-import CameraControlSystem from './components/home';
-import { useAuth, AuthProvider } from './AuthContext';
+import Login from './screens/Login';
+import CameraControlSystem from '../src/components/home';
+import ProtectedRoute from './routes/ProtectedRoute';
+import { AuthProvider } from './AuthContext';
 
 const AppRoutes = () => {
-  const { isAuthenticated } = useAuth();
-
   return (
-    <Router>
-      <Routes>
-        {/* Ruta para el login */}
-        <Route
-          path="/"
-          element={!isAuthenticated ? <Login /> : <Navigate to="/home" />}
-        />
-        
-        {/* Ruta para el home */}
-        <Route
-          path="/home"
-          element={isAuthenticated ? <CameraControlSystem /> : <Navigate to="/" />}
-        />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route 
+            path="/home" 
+            element={
+              <ProtectedRoute>
+                <CameraControlSystem/>
+              </ProtectedRoute>
+            } 
+          />
+          {/* Redirigir cualquier otra ruta al login */}
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 };
 
-const App = () => (
-  <AuthProvider>
-    <AppRoutes />
-  </AuthProvider>
-);
-
-export default App;
-// src/routes/AppRoutes.js
-// src/routes/AppRoutes.js
-// src/routes/AppRoutes.js
-// src/routes/AppRoutes.js
-// src/routes/AppRoutes.js
-
+export default AppRoutes;

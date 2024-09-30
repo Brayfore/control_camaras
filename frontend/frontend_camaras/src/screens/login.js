@@ -1,29 +1,65 @@
-import React, { useState } from 'react';
-import { Container, Box, Typography, TextField, Button, CssBaseline } from '@mui/material';
+/*import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../AuthContext'; // Importa el contexto de autenticación
-import fondoLogin from '../assets/Logo_login.png'; // Importa la imagen de fondo
+import { useAuth } from '../AuthContext'
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const { login } = useAuth();
   const navigate = useNavigate();
-  const { login } = useAuth(); // Obtén la función de login del contexto
 
-  const handleLogin = async () => {
-    if (username && password) {
-      try {
-        await login(username, password); // Llama a la función de login del contexto
-        
-        // Almacena el nombre de usuario en localStorage
-        localStorage.setItem('username', username);
-        
-        navigate('/home'); // Redirige a la página de inicio después del login
-      } catch (error) {
-        alert('Error de autenticación. Por favor, intente nuevamente.');
-      }
-    } else {
-      alert('Por favor, ingrese usuario y contraseña.');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(username, password);
+      navigate('/home');
+    } catch (error) {
+      alert('Error de autenticación. Verifica tus credenciales.');
+    }
+  };
+
+  return (
+    <div>
+      <h2>Iniciar sesión</h2>
+      <form onSubmit={handleSubmit}>
+        <input 
+          type="text" 
+          placeholder="Usuario" 
+          value={username} 
+          onChange={(e) => setUsername(e.target.value)} 
+        />
+        <input 
+          type="password" 
+          placeholder="Contraseña" 
+          value={password} 
+          onChange={(e) => setPassword(e.target.value)} 
+        />
+        <button type="submit">Login</button>
+      </form>
+    </div>
+  );
+};
+
+export default Login;*/
+import React, { useState } from 'react';
+import { Container, Box, Typography, TextField, Button, CssBaseline } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../AuthContext';
+import fondoLogin from '../assets/Logo_login.png'; // Si ya tienes la imagen
+
+const Login = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(username, password);
+      navigate('/home');
+    } catch (error) {
+      alert('Error de autenticación. Verifica tus credenciales.');
     }
   };
 
@@ -37,7 +73,7 @@ const Login = () => {
         background: 'linear-gradient(to bottom, #003366, #0066cc)', // Gradiente azul
         backgroundSize: 'cover',
         backgroundAttachment: 'fixed',
-        position: 'relative', // Posición relativa para el contenedor
+        position: 'relative',
       }}
     >
       <CssBaseline /> {/* Normaliza el CSS */}
@@ -55,7 +91,7 @@ const Login = () => {
         >
           <Box
             component="img"
-            src={fondoLogin}
+            src={fondoLogin} // Asegúrate de tener el archivo de la imagen en la ruta correcta
             alt="Fondo Login"
             sx={{
               width: '100%',
@@ -66,40 +102,44 @@ const Login = () => {
           <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#003366' }}>
             BIENVENIDOS
           </Typography>
-          <TextField
-            label="Usuario"
-            margin="normal"
-            required
-            fullWidth
-            autoFocus
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            label="Contraseña"
-            type="password"
-            margin="normal"
-            required
-            fullWidth
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            sx={{ mb: 2 }}
-          />
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleLogin}
-            sx={{
-              mt: 2,
-              backgroundColor: '#003366',
-              '&:hover': {
-                backgroundColor: '#001f3f',
-              },
-            }}
-          >
-            Iniciar sesión
-          </Button>
+          <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+            <TextField
+              label="Usuario"
+              margin="normal"
+              required
+              fullWidth
+              autoFocus
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              label="Contraseña"
+              type="password"
+              margin="normal"
+              required
+              fullWidth
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              sx={{
+                mt: 2,
+                backgroundColor: '#003366',
+                '&:hover': {
+                  backgroundColor: '#001f3f',
+                },
+                display: 'block',
+                margin: '0 auto',
+              }}
+            >
+              Iniciar sesión
+            </Button>
+          </form>
         </Box>
       </Container>
     </Box>

@@ -1,16 +1,13 @@
-// src/index.js
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App';
-import { AuthProvider } from './AuthContext';
+import AppRoutes from './routes';
+import { AuthProvider } from './AuthContext'; // Contexto de autenticación
 
 const container = document.getElementById('root');
 const root = createRoot(container);
 
 root.render(
   <AuthProvider>
-    <App />
+    <AppRoutes />
   </AuthProvider>
 );
-// src/index.js
-
