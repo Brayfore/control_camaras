@@ -87,7 +87,7 @@ DATABASES = {
         'USER': 'root',  # El usuario de MySQL, por defecto es root en XAMPP
         'PASSWORD': '',  # La contraseña de MySQL, por defecto es vacío en XAMPP
         'HOST': 'localhost',  # Dirección de MySQL, usa localhost si está en tu máquina
-        'PORT': '3306',  # El puerto de MySQL, por defecto es 3306      
+        'PORT': '3306',  # El puerto de MySQL, por defecto es 3306
     }
 }
 
@@ -120,7 +120,7 @@ TIME_ZONE = 'America/Bogota'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)
@@ -154,16 +154,26 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',  # Asegura que las respuestas sean en formato JSON
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',  # Asegura que las solicitudes sean en formato JSON
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '1000/day',  # Limitación de solicitudes para evitar abuso
+        'anon': '100/day',
+    },
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',  # Control de manejo de excepciones
 }
-
 
 # Configuración de SIMPLE_JWT
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
+    'ROTATE_REFRESH_TOKENS': True,  # Rotar tokens cuando se refresca
+    'BLACKLIST_AFTER_ROTATION': True,  # Añadir tokens antiguos a la lista negra después de refrescarlos
+    'UPDATE_LAST_LOGIN': True,  # Actualiza la fecha de último inicio de sesión cuando el token es verificado
 
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
@@ -174,9 +184,11 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
-
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
 
-    'JTI_CLAIM': 'jti',
+    'JTI_CLAIM': 'jti',  # Unique identifier for each token (JSON Token Identifier)
+
+    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=60),  # Token de acceso deslizante
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),  # Vida del token deslizante
 }

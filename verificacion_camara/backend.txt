@@ -1,4 +1,3 @@
-//BACKEND
 from django.db import models
 
 class Dvr(models.Model):
@@ -81,21 +80,30 @@ class DvrSerializer(serializers.ModelSerializer):
 
 # Serializador para manejar el modelo Camara
 class CamaraSerializer(serializers.ModelSerializer):
-    dvr_nombre =serializers.CharField(source='dvr.nombre', read_only=True)
+    dvr_nombre = serializers.CharField(source='dvr.nombre', read_only=True)
+    
     class Meta:
         model = Camara
-        fields = ['id', 'nombre', 'dvr_nombre', 'puerto']
+        fields = ['id', 'nombre', 'dvr', 'dvr_nombre', 'puerto']  # Asegúrate de incluir 'dvr' en los campos
 
-    # Sobrescribir la validación    
+    # Validación general del DVR y el puerto
     def validate(self, data):
         dvr = data.get('dvr')
         puerto = data.get('puerto')
 
-        # Verificar si el puerto ya está en uso para este DVR
+        # Verificar que el DVR sea válido y exista en la base de datos
+        if not Dvr.objects.filter(id=dvr.id).exists():
+            raise serializers.ValidationError("El DVR seleccionado no es válido.")
+
+        # Verifica si el puerto ya está en uso para el DVR seleccionado
         if Camara.objects.filter(dvr=dvr, puerto=puerto).exists():
             raise serializers.ValidationError(f"El puerto {puerto} ya está en uso para este DVR.")
 
+        # Log para depuración
+        print(f"Validando puerto {puerto} para DVR {dvr}")
+
         return data
+
 
 # Serializador para manejar el modelo RegistroGrabacion
 class RegistroGrabacionSerializer(serializers.ModelSerializer):
@@ -108,7 +116,11 @@ class RegistroGrabacionSerializer(serializers.ModelSerializer):
     def validate(self, data):
         dvr = data.get('dvr')
         fecha = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
-        
+
+        # Verificación PM: No se puede hacer una verificación PM antes de las 12 p.m.
+        if data.get('verificacion_pm') and fecha.hour < 12:
+            raise serializers.ValidationError("No se puede hacer una verificación PM antes de las 12 p.m.")
+
         # Verificar si ya existe una verificación AM para esta fecha y DVR
         if data.get('verificacion_am'):
             if RegistroGrabacion.objects.filter(dvr=dvr, fecha__date=fecha.date(), verificacion_am=True).exists():
@@ -121,6 +133,81 @@ class RegistroGrabacionSerializer(serializers.ModelSerializer):
 
         data['fecha'] = fecha
         return data
+
+from rest_framework import viewsets, permissions, generics, serializers  # Asegúrate de importar serializers
+from rest_framework.exceptions import ValidationError  # Importar ValidationError correctamente
+from django.contrib.auth.models import User
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .models import Dvr, RegistroGrabacion, Camara  # Importa el modelo Camara
+from .serializers import DvrSerializer, RegistroGrabacionSerializer, CamaraSerializer, UserSerializerWithToken
+from rest_framework.response import Response
+from rest_framework import status
+
+# ViewSets existentes
+class DvrViewSet(viewsets.ModelViewSet):
+    queryset = Dvr.objects.all()
+    permission_classes = [permissions.AllowAny]
+    serializer_class = DvrSerializer
+
+class RegistroGrabacionViewSet(viewsets.ModelViewSet):
+    queryset = RegistroGrabacion.objects.all()
+    permission_classes = [permissions.AllowAny]
+    serializer_class = RegistroGrabacionSerializer
+
+# Vista para manejar cámaras
+class CamaraViewSet(viewsets.ModelViewSet):
+    queryset = Camara.objects.all()
+    serializer_class = CamaraSerializer
+
+    def get_queryset(self):
+        dvr_id = self.request.query_params.get('dvr')
+        if dvr_id:
+            return Camara.objects.filter(dvr_id=dvr_id)
+        return super().get_queryset()
+
+    def perform_create(self, serializer):
+        try:
+            # Verifica si el DVR existe
+            dvr = serializer.validated_data.get('dvr')
+            puerto = serializer.validated_data.get('puerto')
+
+            if not dvr:
+                raise ValidationError({"detail": "El DVR seleccionado no es válido."})
+
+            # Verifica si el puerto ya está en uso en el DVR seleccionado
+            if Camara.objects.filter(dvr=dvr, puerto=puerto).exists():
+                raise ValidationError({"detail": f"El puerto {puerto} ya está en uso en este DVR."})
+
+            # Asigna automáticamente el nombre del DVR al crear una nueva cámara
+            serializer.save(dvr_nombre=dvr.nombre)
+
+        except ValidationError as e:
+            # Los errores de validación deben ser manejados por DRF
+            raise e
+        except Exception as e:
+            # Si ocurre cualquier otro error, se registra y se devuelve un mensaje genérico
+            print(f"Error inesperado al crear la cámara: {e}")
+            raise ValidationError({"detail": "Error interno al crear la cámara."})
+
+    def perform_update(self, serializer):
+        try:
+            # Asigna automáticamente el nombre del DVR al actualizar una cámara existente
+            serializer.save(dvr_nombre=serializer.validated_data['dvr'].nombre)
+        except Exception as e:
+            print(f"Error inesperado al actualizar la cámara: {e}")
+            raise ValidationError({"detail": "Error interno al actualizar la cámara."})
+
+# Nuevas vistas para manejo de autenticación
+class UserRegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializerWithToken
+    permission_classes = [permissions.AllowAny]
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    permission_classes = [permissions.AllowAny]
+
+class CustomTokenRefreshView(TokenRefreshView):
+    permission_classes = [permissions.AllowAny]
 
 # aplicacion_camara/urls.py
 from django.urls import include, path
@@ -141,486 +228,214 @@ urlpatterns = [
     path('api/token/ref resh/', CustomTokenRefreshView.as_view(), name='token_refresh'),  # Incluye todas las rutas registradas en el router.
 ]
 
-
-
-# Comentado: Ejemplo alternativo de cómo definir el router y las rutas.
-""""
-from rest_framework import routers
-from .api import UbicacionViewSet
-
-router = routers.DefaultRouter()
-
-router.register('ubicaciones', UbicacionViewSet, 'ubicaciones')
-
-urlpatterns = router.urls
 """
-# aplicacion_camara/urls.py
+Django settings for verificacion_camara project.
 
-//FRONTEND
-import React, { useState, useEffect } from 'react';
-import { Box, Modal, Typography, Button, TextField, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import { fetchDvrs, fetchCamarasByDvr, createCamara } from '../services/apiService'; // Asegúrate de que los paths sean correctos
+Generated by 'django-admin startproject' using Django 5.0.7.
 
-const CreateCamaraModal = ({ open, onClose }) => {
-  const [dvrs, setDvrs] = useState([]);
-  const [selectedDvr, setSelectedDvr] = useState('');
-  const [camaraName, setCamaraName] = useState('');
-  const [puertosDisponibles, setPuertosDisponibles] = useState([]);
-  const [selectedPuerto, setSelectedPuerto] = useState('');
+For more information on this file, see
+https://docs.djangoproject.com/en/5.0/topics/settings/
 
-  // Cargar todos los DVRs al cargar el componente
-// Cargar todos los DVRs al cargar el componente
-useEffect(() => {
-    const loadDvrs = async () => {
-      try {
-        const dvrData = await fetchDvrs();  // Esta llamada debería traer todos los DVRs
-        setDvrs(dvrData);  // Asegúrate de actualizar correctamente el estado con los DVRs
-      } catch (error) {
-        console.error('Error al cargar DVRs:', error);
-      }
-    };
-  
-    loadDvrs();
-  }, []);
-  
-  // Cargar las cámaras de un DVR específico para verificar los puertos ocupados
-  useEffect(() => {
-    const loadCamaras = async () => {
-      if (selectedDvr) {
-        try {
-          // Llamada a la API para obtener las cámaras del DVR seleccionado
-          const camaras = await fetchCamarasByDvr(selectedDvr);
-  
-          // Obtener los puertos ocupados por las cámaras asociadas al DVR seleccionado
-          const puertosOcupados = camaras.map(camara => camara.puerto);
-  
-          // Buscar el DVR seleccionado en la lista de DVRs y obtener su cantidad total de puertos
-          const dvrSeleccionado = dvrs.find(dvr => dvr.id === selectedDvr);
-          
-          // Asegurarse de que el DVR seleccionado exista y tenga puertos asignados
-          const totalPuertos = dvrSeleccionado ? dvrSeleccionado.puertos : 0;
-  
-          // Generar una lista de puertos disponibles excluyendo los ocupados
-          const puertosDisponibles = Array.from({ length: totalPuertos }, (_, i) => i + 1)
-            .filter(puerto => !puertosOcupados.includes(puerto));
-  
-          // Actualizar el estado con la lista de puertos disponibles
-          setPuertosDisponibles(puertosDisponibles);
-        } catch (error) {
-          console.error("Error al cargar las cámaras del DVR:", error);
-          // En caso de error, asegurarse de limpiar el estado para evitar datos corruptos
-          setPuertosDisponibles([]);
-        }
-      } else {
-        // Si no hay DVR seleccionado, limpiar los puertos disponibles
-        setPuertosDisponibles([]);
-      }
-    };
-  
-    loadCamaras();
-  }, [selectedDvr, dvrs]);
-  
-  
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/5.0/ref/settings/
+"""
 
-  const handleCreateCamara = async () => {
-    try {
-      await createCamara({
-        nombre: camaraName,
-        dvr: selectedDvr, // ID del DVR
-        puerto: selectedPuerto // Puerto seleccionado
-      });
-      alert('Cámara creada exitosamente');
-      setCamaraName('');
-      setSelectedPuerto('');
-      onClose();
-    } catch (error) {
-      console.error('Error al crear la cámara:', error);
-      alert('Error al crear la cámara. Puede que el puerto ya esté en uso.');
+from pathlib import Path
+from datetime import timedelta
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = 'django-insecure-t95n-#=0v%qgt58z-1vde2kk&j4jwuvjb0y9aaxt_@+-e*2++@'
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+ALLOWED_HOSTS = []
+
+
+# Application definition
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'aplicacion_camara',
+    'verificacion_camara',
+    'corsheaders',  # Añadido corsheaders
+]
+
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Añadido CorsMiddleware
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'verificacion_camara.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'verificacion_camara.wsgi.application'
+
+
+# Database
+# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'control_de_camaras',  # El nombre de la base de datos que crearás en MySQL
+        'USER': 'root',  # El usuario de MySQL, por defecto es root en XAMPP
+        'PASSWORD': '',  # La contraseña de MySQL, por defecto es vacío en XAMPP
+        'HOST': 'localhost',  # Dirección de MySQL, usa localhost si está en tu máquina
+        'PORT': '3306',  # El puerto de MySQL, por defecto es 3306      
     }
-  };
-  
-  
-
-  return (
-    <Modal open={open} onClose={onClose}>
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 400,
-          bgcolor: 'background.paper',
-          boxShadow: 24,
-          p: 4,
-          borderRadius: 2,
-        }}
-      >
-        <Typography variant="h6" gutterBottom>Crear Cámara</Typography>
-
-        <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>Seleccione un DVR</InputLabel>
-          <Select value={selectedDvr} onChange={(e) => setSelectedDvr(e.target.value)} label="Seleccione un DVR">
-            {dvrs.length > 0 ? (
-              dvrs.map((dvr) => (
-                <MenuItem key={dvr.id} value={dvr.id}>
-                  {dvr.nombre}
-                </MenuItem>
-              ))
-            ) : (
-              <MenuItem value="">No hay DVRs disponibles</MenuItem>
-            )}
-          </Select>
-        </FormControl>
-
-        <TextField
-          label="Nombre de la Cámara *"
-          value={camaraName}
-          onChange={(e) => setCamaraName(e.target.value)}
-          fullWidth
-          sx={{ mb: 2 }}
-        />
-
-        <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>Seleccione un Puerto</InputLabel>
-          <Select
-            value={selectedPuerto}
-            onChange={(e) => setSelectedPuerto(e.target.value)}
-            label="Seleccione un Puerto"
-          >
-            {puertosDisponibles.length > 0 ? (
-              puertosDisponibles.map((puerto) => (
-                <MenuItem key={puerto} value={puerto}>
-                  {puerto}
-                </MenuItem>
-              ))
-            ) : (
-              <MenuItem value="">No hay puertos disponibles</MenuItem>
-            )}
-          </Select>
-        </FormControl>
-
-        <Button
-          variant="contained"
-          color="primary"
-          fullWidth
-          onClick={handleCreateCamara}
-          disabled={!selectedDvr || !camaraName || !selectedPuerto} // Deshabilita el botón si falta algún campo
-        >
-          CREAR CÁMARA
-        </Button>
-      </Box>
-    </Modal>
-  );
-};
-
-export default CreateCamaraModal;
-
-import React, { useEffect, useState } from 'react';
-import { Box, Typography } from '@mui/material';
-import { fetchDvrs, createDvr, deleteDvr, createRegistro } from '../services/apiService';
-import ProfileSidebar from './ProfileSidebar';
-import CameraTable from './CameraTable';
-import Swal from 'sweetalert2'
-import '../styles/CameraControlSystem.css';  // Importamos el archivo CSS
-
-const CameraControlSystem = () => {
-  const [dvrs, setDvrs] = useState([]);
-  const [showCameraControl, setShowCameraControl] = useState(false);
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const dvrsData = await fetchDvrs();
-        setDvrs(dvrsData.map(dvr => ({
-          ...dvr,
-          diasGrabacion: '',
-          verificacionAM: false,
-          verificacionPM: false,
-          amDisabled: false,
-          pmDisabled: false,
-        })));
-      } catch (error) {
-        console.error('Failed to load DVRs:', error);
-      }
-    };
-    loadData();
-  }, []);
-
-  const handleEdit = (id, field, value) => {
-    setDvrs(prevDvrs => {
-      const updatedDvrs = prevDvrs.map(dvr => {
-        if (dvr.id === id) {
-          const updatedDvr = { ...dvr, [field]: value };
-  
-          if (field === 'fechaInicio' || field === 'fechaFinal') {
-            const { fechaInicio, fechaFinal } = updatedDvr;
-  
-            if (fechaInicio && fechaFinal) {
-              const startDate = new Date(fechaInicio);
-              const endDate = new Date(fechaFinal);
-              const daysOfRecording = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-  
-              if (daysOfRecording > 0) {
-                updatedDvr.diasGrabacion = daysOfRecording;
-              } else {
-                updatedDvr.diasGrabacion = 0;
-              }
-            }
-          }
-  
-          return updatedDvr;
-        }
-        return dvr;
-      });
-  
-      return updatedDvrs;
-    });
-  };
-  
-  
-  
-
-  const handleRegister = async (id) => {
-    const dvr = dvrs.find(dvr => dvr.id === id);
-  
-    // Verificar que al menos una verificación esté seleccionada
-    if (!dvr.verificacionAM && !dvr.verificacionPM) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Registro Incompleto',
-        text: 'Debe seleccionar al menos una verificación (AM o PM) para registrar.',
-      });
-      return;
-    }
-  
-    const registroData = {
-      dvr: id,
-      dias_grabacion: dvr.diasGrabacion,
-      verificacion_am: dvr.verificacionAM,
-      verificacion_pm: dvr.verificacionPM,
-      fecha_inicio: dvr.fechaInicio ? new Date(dvr.fechaInicio).toISOString().split('T')[0] : null,
-      fecha_final: dvr.fechaFinal ? new Date(dvr.fechaFinal).toISOString().split('T')[0] : null,
-    };
-  
-    try {
-      await createRegistro(registroData);
-      Swal.fire({
-        icon: 'success',
-        title: 'Registro Exitoso',
-        text: 'El registro se ha creado correctamente.',
-      });
-  
-      // Asegúrate de que las funciones de edición no causen un re-renderizado innecesario o problemas de diseño.
-      if (dvr.verificacionAM) {
-        handleEdit(id, 'amDisabled', true);
-        handleEdit(id, 'verificacionAM', false);
-      }
-  
-      if (dvr.verificacionPM) {
-        handleEdit(id, 'pmDisabled', true);
-        handleEdit(id, 'verificacionPM', false);
-      }
-      
-      // Podrías agregar un setState vacío para forzar un re-render sin afectar el diseño
-      setDvrs(prevDvrs => [...prevDvrs]);
-  
-    } catch (error) {
-      console.error('Error creando el registro:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Hubo un error al crear el registro.',
-      });
-    }
-  };
-  
-  
-  
-
-  const handleCreateDvr = async (newDvrData) => {
-    try {
-      const newDvr = await createDvr(newDvrData);
-      setDvrs([...dvrs, {
-        ...newDvr,
-        diasGrabacion: '',
-        verificacionAM: false,
-        verificacionPM: false,
-        amDisabled: false,
-        pmDisabled: false,
-      }]);
-    } catch (error) {
-      console.error('Error creating DVR:', error);
-    }
-  };
-
-  const handleDeleteDvr = async (id) => {
-    try {
-      await deleteDvr(id);
-      setDvrs(dvrs.filter(dvr => dvr.id !== id));
-    } catch (error) {
-      console.error('Error deleting DVR:', error);
-    }
-  };
-
-  const toggleContentVisibility = () => {
-    setShowCameraControl(true);
-  };
-
-  const username = localStorage.getItem('username');
-
-  return (
-    <Box className="camera-control-system">
-      <ProfileSidebar
-        username={username}
-        handleLogout={() => {
-          localStorage.removeItem('uid');
-          localStorage.removeItem('username');
-          window.location.href = '/';
-        }}
-        dvrs={dvrs}
-        onCreateDvr={handleCreateDvr}
-        onDeleteDvr={handleDeleteDvr}
-        onShowCameraControl={toggleContentVisibility}
-      />
-
-      <Box className="camera-control-content">
-        {showCameraControl ? (
-          <Box className="camera-table-wrapper">
-            <Typography variant="h4" gutterBottom sx={{ color: '#003366', textAlign: 'center' }}>
-              Control de Cámaras
-            </Typography>
-            <CameraTable
-              dvrs={dvrs}
-              handleEdit={handleEdit}
-              handleRegister={handleRegister}
-            />
-          </Box>
-        ) : (
-          <Typography
-            variant="h4"
-            gutterBottom
-            className="welcome-message"
-          >
-            Bienvenido al Control de Cámaras
-          </Typography>
-        )}
-      </Box>
-    </Box>
-  );
-};
-
-export default CameraControlSystem;
-
-import axios from 'axios';
-
-const API_URL = 'http://127.0.0.1:8000/api';
-
-// Crea una instancia de Axios para configurar la base URL si es necesario
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Función para obtener las cámaras de un DVR específico
-export const fetchCamarasByDvr = async (dvrId) => {
-  try {
-    const response = await api.get(`/camaras/?dvr=${dvrId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching camaras:', error);
-    throw error;
-  }
-};
+}
 
 
-// Función para obtener la lista de DVRs
-export const fetchDvrs = async () => {
-  try {
-    const response = await api.get('/dvrs/');
-    console.log(response);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching DVRs:', error);
-    throw error;
-  }
-};
+# Password validation
+# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
-// Función para crear un nuevo DVR
-export const createDvr = async (dvrData) => {
-  try {
-    const response = await api.post('/dvrs/', dvrData);
-    return response.data;
-  } catch (error) {
-    console.error('Error creating DVR:', error);
-    throw error;
-  }
-};
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
-// Función para eliminar DVR
-export const deleteDvr = async (dvrId) => {
-  try {
-    await api.delete(`/dvrs/${dvrId}/`);
-  } catch (error) {
-    console.error('Error deleting DVR:', error);
-    throw error;
-  }
-};
 
-// Función para obtener registros
-export const fetchRegistros = async () => {
-  try {
-    const response = await api.get('/registros/');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching registros:', error);
-    throw error;
-  }
-};
+# Internationalization
+# https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-// Función para crear un registro
-export const createRegistro = async (registroData) => {
-  try {
-    const response = await api.post('/registros/', registroData);
-    return response.data;
-  } catch (error) {
-    console.error('Error creating registro:', error);
-    throw error;
-  }
-};
+LANGUAGE_CODE = 'en-us'
 
-// Función para obtener la lista de Cámaras
-export const fetchCamaras = async () => {
-  try {
-    const response = await api.get('/camaras/');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching camaras:', error);
-    throw error;
-  }
-};
+TIME_ZONE = 'America/Bogota'
 
-// Función para crear una nueva Cámara
-export const createCamara = async (camaraData) => {
-  try {
-    const response = await api.post('/camaras/', camaraData);
-    return response.data;
-  } catch (error) {
-    console.error('Error creating camara:', error);
-    throw error;
-  }
-};
+USE_I18N = True
 
-// Función para eliminar una Cámara
-export const deleteCamara = async (camaraId) => {
-  try {
-    await api.delete(`/camaras/${camaraId}/`);
-  } catch (error) {
-    console.error('Error deleting camara:', error);
-    throw error;
-  }
-};
+USE_TZ = True
 
-export default api;
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.0/howto/static-files/
+
+STATIC_URL = 'static/'
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CORS settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+# Alternativamente, para desarrollo
+# CORS_ALLOW_ALL_ORIGINS = True
+
+# Configuración de REST Framework para usar JWT
+# settings.py
+
+REST_FRAMEWORK = {
+    'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+}
+
+
+# Configuración de SIMPLE_JWT
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': False,
+
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
+
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+
+    'JTI_CLAIM': 'jti',
+}
+
+"""
+URL configuration for verificacion_camara project.
+
+The `urlpatterns` list routes URLs to views. For more information please see:
+    https://docs.djangoproject.com/en/5.0/topics/http/urls/
+Examples:
+Function views
+    1. Add an import:  from my_app import views
+    2. Add a URL to urlpatterns:  path('', views.home, name='home')
+Class-based views
+    1. Add an import:  from other_app.views import Home
+    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+Including another URLconf
+    1. Import the include() function: from django.urls import include, path
+    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+"""
+from django.contrib import admin
+from django.urls import path, include
+# Definición de las rutas principales del proyecto.
+urlpatterns = [
+    path('admin/', admin.site.urls),  # Ruta para el panel de administración de Django.
+    path('', include('aplicacion_camara.urls')),  # Incluye las rutas definidas en el archivo urls.py de la aplicación 'aplicacion_camara'.
+]
+# verificacion_camara/urls.py
+
+
+
+

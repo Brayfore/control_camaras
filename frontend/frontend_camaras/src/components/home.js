@@ -266,7 +266,7 @@ const Home = () => {
   };
 
   // Función para editar DVRs
-  const handleEdit = (id, field, value) => {
+  /*const handleEdit = (id, field, value) => {
     setDvrs(prevDvrs => {
       const updatedDvrs = prevDvrs.map(dvr => {
         if (dvr.id === id) {
@@ -291,7 +291,41 @@ const Home = () => {
 
       return updatedDvrs;
     });
-  };
+  };*/
+
+  const handleEdit = (id, field, value) => {
+    setDvrs(prevDvrs => {
+      const updatedDvrs = prevDvrs.map(dvr => {
+        if (dvr.id === id) {
+          const updatedDvr = { ...dvr, [field]: value };
+  
+          if (field === 'fechaInicio' || field === 'fechaFinal') {
+            const { fechaInicio, fechaFinal } = updatedDvr;
+  
+            if (fechaInicio && fechaFinal) {
+              // Asegúrate de convertir el valor a objetos de fecha válidos
+              const startDate = new Date(fechaInicio);
+              const endDate = new Date(fechaFinal);
+  
+              // Asegúrate de que ambas fechas sean válidas
+              if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                const daysOfRecording = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+  
+                updatedDvr.diasGrabacion = daysOfRecording > 0 ? daysOfRecording : 0;
+              } else {
+                updatedDvr.diasGrabacion = 0; // Si las fechas no son válidas, el número de días es 0
+              }
+            }
+          }
+  
+          return updatedDvr;
+        }
+        return dvr;
+      });
+  
+      return updatedDvrs;
+    });
+  };  
 
   // Manejo del registro de DVRs
   const handleRegister = async (id) => {

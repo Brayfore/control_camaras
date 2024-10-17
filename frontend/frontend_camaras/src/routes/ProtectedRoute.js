@@ -9,6 +9,7 @@ const ProtectedRoute = ({ children }) => {
     return <div>Cargando...</div>; // Puedes personalizar el mensaje de carga
   }
 
+  // Si no hay tokens, redirige al login
   return authTokens ? children : <Navigate to="/login" />;
 };
 

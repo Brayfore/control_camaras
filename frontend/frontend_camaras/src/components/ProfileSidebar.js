@@ -40,7 +40,7 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
       >
         <Box className="profile-sidebar">
           <Typography variant="h6" gutterBottom>Perfil</Typography>
-          <Typography variant="body1" gutterBottom>Usuario: {username || 'No disponible'}</Typography>
+          <Typography variant="body1" gutterBottom>Menu: {username || 'Principal'}</Typography>
 
           <Button variant="contained" color="error" onClick={handleLogout} startIcon={<LogoutIcon />} sx={{ mt: 2, px: 7}}>
             Cerrar sesión
@@ -88,3 +88,4 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
 };
 
 export default ProfileSidebar;
+

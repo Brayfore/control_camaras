@@ -7,21 +7,41 @@ from .serializers import DvrSerializer, RegistroGrabacionSerializer, CamaraSeria
 from rest_framework.response import Response
 from rest_framework import status
 
+
 # ViewSets existentes
 class DvrViewSet(viewsets.ModelViewSet):
     queryset = Dvr.objects.all()
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]  # Solo usuarios autenticados pueden acceder
     serializer_class = DvrSerializer
+
+    def perform_create(self, serializer):
+        # Asignamos el usuario autenticado al campo created_by
+        serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        # Asignamos el usuario autenticado al campo created_by al actualizar
+        serializer.save(created_by=self.request.user)
+
 
 class RegistroGrabacionViewSet(viewsets.ModelViewSet):
     queryset = RegistroGrabacion.objects.all()
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]  # Solo usuarios autenticados pueden acceder
     serializer_class = RegistroGrabacionSerializer
+
+    def perform_create(self, serializer):
+        # Asignamos el usuario autenticado al campo created_by
+        serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        # Asignamos el usuario autenticado al campo created_by al actualizar
+        serializer.save(created_by=self.request.user)
+
 
 # Vista para manejar cámaras
 class CamaraViewSet(viewsets.ModelViewSet):
     queryset = Camara.objects.all()
     serializer_class = CamaraSerializer
+    permission_classes = [permissions.IsAuthenticated]  # Solo usuarios autenticados pueden acceder
 
     def get_queryset(self):
         dvr_id = self.request.query_params.get('dvr')
@@ -42,33 +62,36 @@ class CamaraViewSet(viewsets.ModelViewSet):
             if Camara.objects.filter(dvr=dvr, puerto=puerto).exists():
                 raise ValidationError({"detail": f"El puerto {puerto} ya está en uso en este DVR."})
 
-            # Asigna automáticamente el nombre del DVR al crear una nueva cámara
-            serializer.save(dvr_nombre=dvr.nombre)
+            # Asigna automáticamente el nombre del DVR y el usuario autenticado
+            serializer.save(dvr_nombre=dvr.nombre, created_by=self.request.user)
 
         except ValidationError as e:
-            # Los errores de validación deben ser manejados por DRF
             raise e
         except Exception as e:
-            # Si ocurre cualquier otro error, se registra y se devuelve un mensaje genérico
             print(f"Error inesperado al crear la cámara: {e}")
             raise ValidationError({"detail": "Error interno al crear la cámara."})
 
     def perform_update(self, serializer):
         try:
-            # Asigna automáticamente el nombre del DVR al actualizar una cámara existente
-            serializer.save(dvr_nombre=serializer.validated_data['dvr'].nombre)
+            # Asigna automáticamente el nombre del DVR y el usuario autenticado al actualizar
+            serializer.save(dvr_nombre=serializer.validated_data['dvr'].nombre, created_by=self.request.user)
         except Exception as e:
             print(f"Error inesperado al actualizar la cámara: {e}")
             raise ValidationError({"detail": "Error interno al actualizar la cámara."})
 
-# Nuevas vistas para manejo de autenticación
+
+# Nuevas vistas para manejo de autenticaciónclass UserRegisterView(generics.CreateAPIView):
 class UserRegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializerWithToken
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.AllowAny]  # Permitir que cualquiera pueda registrarse (esto es adecuado para registro de usuarios)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.AllowAny]  # Permitir que cualquier usuario con credenciales correctas obtenga un token
 
 class CustomTokenRefreshView(TokenRefreshView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.AllowAny]  # Cualquiera con un token de actualización válido puede obtener un nuevo token de acceso
+
+
+
+

@@ -2,8 +2,7 @@ from rest_framework import serializers
 from .models import Dvr, RegistroGrabacion, Camara  # Asegúrate de importar el modelo Camara
 from django.contrib.auth.models import User
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.utils import timezone
-import pytz  # Para manejar zonas horarias
+from datetime import datetime
 
 # Serializadores para manejar el registro y la autenticación de usuarios
 class UserSerializer(serializers.ModelSerializer):
@@ -30,17 +29,25 @@ class UserSerializerWithToken(UserSerializer):
 
 # Serializador para manejar el modelo Dvr
 class DvrSerializer(serializers.ModelSerializer):
+    created_by = serializers.ReadOnlyField(source='created_by.username')  # Mostrar el nombre del creador
+
     class Meta:
         model = Dvr
-        fields = ('id', 'nombre', 'ip', 'capacidad', 'puertos', 'ubicacion')
+        fields = ('id', 'nombre', 'ip', 'capacidad', 'puertos', 'ubicacion', 'created_by')
+
+    def create(self, validated_data):
+        request = self.context.get('request')  # Obtener la solicitud actual del contexto
+        validated_data['created_by'] = request.user  # Asignar el usuario que creó el registro
+        return super().create(validated_data)
 
 # Serializador para manejar el modelo Camara
 class CamaraSerializer(serializers.ModelSerializer):
     dvr_nombre = serializers.CharField(source='dvr.nombre', read_only=True)
+    created_by = serializers.ReadOnlyField(source='created_by.username')  # Mostrar el nombre del creador
     
     class Meta:
         model = Camara
-        fields = ['id', 'nombre', 'dvr', 'dvr_nombre', 'puerto']  # Asegúrate de incluir 'dvr' en los campos
+        fields = ['id', 'nombre', 'dvr', 'dvr_nombre', 'puerto', 'created_by']  # Asegúrate de incluir 'created_by'
 
     # Validación general del DVR y el puerto
     def validate(self, data):
@@ -55,23 +62,25 @@ class CamaraSerializer(serializers.ModelSerializer):
         if Camara.objects.filter(dvr=dvr, puerto=puerto).exists():
             raise serializers.ValidationError(f"El puerto {puerto} ya está en uso para este DVR.")
 
-        # Log para depuración
-        print(f"Validando puerto {puerto} para DVR {dvr}")
-
         return data
 
+    def create(self, validated_data):
+        request = self.context.get('request')  # Obtener la solicitud actual del contexto
+        validated_data['created_by'] = request.user  # Asignar el usuario que creó el registro
+        return super().create(validated_data)
 
 # Serializador para manejar el modelo RegistroGrabacion
 class RegistroGrabacionSerializer(serializers.ModelSerializer):
     dvr = serializers.PrimaryKeyRelatedField(queryset=Dvr.objects.all())
+    created_by = serializers.ReadOnlyField(source='created_by.username')  # Mostrar el nombre del creador
 
     class Meta:
         model = RegistroGrabacion
-        fields = ('id', 'fecha', 'dias_grabacion', 'verificacion_am', 'verificacion_pm', 'observacion', 'dvr', 'fecha_inicio', 'fecha_final')
+        fields = ('id', 'fecha', 'dias_grabacion', 'verificacion_am', 'verificacion_pm', 'observacion', 'dvr', 'fecha_inicio', 'fecha_final', 'created_by')
 
     def validate(self, data):
         dvr = data.get('dvr')
-        fecha = timezone.localtime(timezone.now()).replace(second=0, microsecond=0)
+        fecha = datetime.now().replace(second=0, microsecond=0)  # Usamos datetime.now() para obtener la hora local
 
         # Verificación PM: No se puede hacer una verificación PM antes de las 12 p.m.
         if data.get('verificacion_pm') and fecha.hour < 12:
@@ -87,5 +96,16 @@ class RegistroGrabacionSerializer(serializers.ModelSerializer):
             if RegistroGrabacion.objects.filter(dvr=dvr, fecha__date=fecha.date(), verificacion_pm=True).exists():
                 raise serializers.ValidationError("Ya existe una verificación PM para esta fecha y DVR.")
 
-        data['fecha'] = fecha
+        # Asegurarse de que al menos una verificación (AM o PM) esté presente
+        if not data.get('verificacion_am') and not data.get('verificacion_pm'):
+            raise serializers.ValidationError("Debe marcar al menos una verificación, ya sea AM o PM.")
+
+        data['fecha'] = fecha  # Registrar la fecha actual
         return data
+
+    def create(self, validated_data):
+        request = self.context.get('request')  # Obtener la solicitud actual del contexto
+        validated_data['created_by'] = request.user  # Asignar el usuario que creó el registro
+        return super().create(validated_data)
+    
+

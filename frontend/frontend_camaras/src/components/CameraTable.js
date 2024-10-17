@@ -166,7 +166,7 @@ const CameraTable = ({ dvrs, handleEdit, handleRegister }) => {
 };
 
 export default CameraTable;*/
-//Aquí el código esta perfecto
+//Aquí el código esta perfecto ESTE CÓDIGO ES EL BUENO POR SI PASA CUALQUIER COSA, UTILICE ESTE CÓDIGO
 import React, { useState } from "react";
 import {
   Box,
@@ -234,7 +234,7 @@ const CameraTable = ({ dvrs, handleEdit, handleRegister }) => {
                   "Fecha Final",
                   "Verificación AM",
                   "Verificación PM",
-                  "Obs.",  // Encabezado más corto para observación
+                  "Obs.", // Encabezado más corto para observación
                   "Acciones", // Manteniendo las acciones originales
                 ].map((header) => (
                   <TableCell key={header} className="table-cell-header">
@@ -385,8 +385,8 @@ const CameraTable = ({ dvrs, handleEdit, handleRegister }) => {
           <TextField
             label="Escriba su observación"
             value={
-              paginatedDvrs.find((dvr) => dvr.id === currentDvrId)?.observacion ||
-              ""
+              paginatedDvrs.find((dvr) => dvr.id === currentDvrId)
+                ?.observacion || ""
             }
             onChange={(e) =>
               handleEdit(currentDvrId, "observacion", e.target.value)
@@ -410,4 +410,3 @@ const CameraTable = ({ dvrs, handleEdit, handleRegister }) => {
 };
 
 export default CameraTable;
-
