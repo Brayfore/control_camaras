@@ -19,7 +19,7 @@ const ProfileSidebar = ({ username, handleLogout, dvrs, onCreateDvr, onDeleteDvr
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
 
-  const handleOpenDeleteModal = () => setIsDeleteModalOpen(true);
+  
   const handleCloseDeleteModal = () => setIsDeleteModalOpen(false);
 
   const handleOpenCreateCamaraModal = () => setIsCreateCamaraModalOpen(true); // Abrir modal de crear cámara

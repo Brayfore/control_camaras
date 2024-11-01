@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import Swal from 'sweetalert2'; // Importamos SweetAlert2
 import {
   Box,
   Modal,
@@ -24,7 +25,7 @@ const CreateCamaraModal = ({ open, onClose }) => {
   const [selectedPuerto, setSelectedPuerto] = useState(""); // Puerto seleccionado
 
   // Función para cargar las cámaras y obtener los puertos ocupados solo del DVR seleccionado
-  const loadCamaras = async () => {
+  const loadCamaras = useCallback(async () => {
     if (selectedDvr) {
       try {
         const camaras = await fetchCamarasByDvr(selectedDvr); // Solo obtener cámaras del DVR seleccionado
@@ -50,7 +51,7 @@ const CreateCamaraModal = ({ open, onClose }) => {
     } else {
       setPuertosDisponibles([]); // Si no hay DVR seleccionado, no mostrar puertos
     }
-  };
+  }, [selectedDvr, dvrs]); // Se asegura que useCallback dependa de selectedDvr y dvrs
 
   // Cargar todos los DVRs al cargar el componente
   useEffect(() => {
@@ -68,8 +69,8 @@ const CreateCamaraModal = ({ open, onClose }) => {
 
   // Cargar las cámaras del DVR seleccionado para verificar los puertos ocupados solo para ese DVR
   useEffect(() => {
-    loadCamaras(); // Llama a loadCamaras cada vez que cambie el DVR seleccionado
-  }, [selectedDvr, dvrs]);
+    loadCamaras(); // Llama a loadCamaras cada vez que cambie el DVR seleccionado o la lista de DVRs
+  }, [loadCamaras]); // Se asegura de que el hook se ejecute cuando loadCamaras cambie
 
   // Función para manejar la creación de la cámara
   const handleCreateCamara = async () => {
@@ -80,7 +81,13 @@ const CreateCamaraModal = ({ open, onClose }) => {
         puerto: selectedPuerto  // Puerto seleccionado
       });
 
-      alert('Cámara creada exitosamente');
+      // Usamos SweetAlert2 para mostrar el mensaje de éxito
+      Swal.fire({
+        icon: 'success',
+        title: 'Cámara creada correctamente',
+        showConfirmButton: true,
+        timer: 1500
+      });
 
       // Reiniciar los campos del formulario
       setCamaraName('');
@@ -93,7 +100,11 @@ const CreateCamaraModal = ({ open, onClose }) => {
       await loadCamaras();
     } catch (error) {
       console.error('Error al crear la cámara:', error.response || error);
-      alert('Error al crear la cámara. Puede que el puerto ya esté en uso.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error al crear la cámara. Puede que el puerto ya esté en uso.',
+      });
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Modal, TextField, Button, Typography } from '@mui/material';
+import Swal from 'sweetalert2'; // Importamos SweetAlert2
 
 const DvrCreateModal = ({ open, onClose, onCreate }) => {
   const [formData, setFormData] = useState({
@@ -9,8 +10,6 @@ const DvrCreateModal = ({ open, onClose, onCreate }) => {
     puertos: '',
     ubicacion: '',
   });
-
-  const [error, setError] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -23,7 +22,7 @@ const DvrCreateModal = ({ open, onClose, onCreate }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const newDvr = await onCreate(formData);
+      await onCreate(formData);  // No necesitamos asignar newDvr si no la usamos
       setFormData({
         nombre: '',
         ip: '',
@@ -32,8 +31,22 @@ const DvrCreateModal = ({ open, onClose, onCreate }) => {
         ubicacion: '',
       });
       onClose();
+
+      // Mostrar alerta de éxito usando SweetAlert2
+      Swal.fire({
+        title: 'DVR Creado',
+        text: 'El DVR ha sido creado correctamente.',
+        icon: 'success',
+        confirmButtonText: 'OK',
+      });
+      
     } catch (error) {
-      setError('DVR CREADO CORRECTAMENTE.');
+      Swal.fire({
+        title: 'Error',
+        text: 'Hubo un error al crear el DVR.',
+        icon: 'error',
+        confirmButtonText: 'OK',
+      });
     }
   };
 
@@ -55,7 +68,7 @@ const DvrCreateModal = ({ open, onClose, onCreate }) => {
         }}
       >
         <Typography variant="h6" gutterBottom>Registrar DVR</Typography>
-        {error && <Typography color="green" gutterBottom>{error}</Typography>}
+
         <TextField
           label="Nombre"
           name="nombre"
@@ -76,7 +89,7 @@ const DvrCreateModal = ({ open, onClose, onCreate }) => {
         />
         <TextField
           label="Almacenamiento"
-          name="capacidad" //Capacidad se refiere a almacenamiento
+          name="capacidad"
           value={formData.capacidad}
           onChange={handleChange}
           fullWidth

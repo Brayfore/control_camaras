@@ -1,21 +1,55 @@
-import axios from 'axios';
+import axios from "axios";
+import { jwtDecode } from 'jwt-decode';
 
-const API_URL = 'http://127.0.0.1:8000/api';
+const isDevelopment = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 
-// Crea una instancia de Axios para configurar la base URL
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: isDevelopment
+    ? "http://127.0.0.1:8000/api"  // Dirección local en desarrollo
+    : "http://172.168.11.229:8000/api",  // Dirección IP en producción
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Interceptor para agregar el token JWT a las solicitudes
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  const decodedToken = jwtDecode(token);
+  const currentTime = Date.now() / 1000; // Tiempo actual en segundos
+  return decodedToken.exp < currentTime; // True si el token ha expirado
+};
+
+
+/*api.interceptors.request.use(
+  (config) => {
+    const storedTokens = localStorage.getItem('tokens');
+    if (storedTokens) {
+      const { access } = JSON.parse(storedTokens);
+      config.headers['Authorization'] = `Bearer ${access}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);*/
+
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    const storedTokens = localStorage.getItem('tokens');
+    if (storedTokens) {
+      const { access } = JSON.parse(storedTokens);
+
+      // Verificar si el token ha expirado antes de cada solicitud
+      if (isTokenExpired(access)) {
+        // Si el token ha expirado, hacer logout
+        localStorage.removeItem('tokens'); // Elimina los tokens
+        window.location.href = '/login';   // Redirigir al login
+        throw new Error('Token expirado, redirigiendo al login...');
+      }
+
+      // Si el token no ha expirado, añadirlo a las cabeceras
+      config.headers['Authorization'] = `Bearer ${access}`;
     }
     return config;
   },
@@ -25,28 +59,65 @@ api.interceptors.request.use(
 );
 
 // Función para refrescar el token de acceso si ha expirado
-// Función para refrescar el token de acceso si ha expirado
-const refreshAccessToken = async () => {
+/*const refreshAccessToken = async () => {
   try {
-    const refresh_token = localStorage.getItem('refresh_token');
-    if (!refresh_token) {
-      throw new Error('No refresh token found in localStorage');
+    const storedTokens = localStorage.getItem('tokens');
+    if (!storedTokens) {
+      throw new Error('No tokens found in localStorage');
     }
-    const response = await axios.post(`${API_URL}/token/refresh/`, {
-      refresh: refresh_token,
-    });
 
-    // Guarda el nuevo token de acceso
-    localStorage.setItem('access_token', response.data.access);
+    const { refresh } = JSON.parse(storedTokens);
+    
+    if (!refresh) {
+      throw new Error('No refresh token found');
+    }
+
+    const response = await axios.post(`${API_URL}/token/refresh/`, { refresh });
+
+    // Actualiza el token de acceso en localStorage
+    const newTokens = { access: response.data.access, refresh };
+    localStorage.setItem('tokens', JSON.stringify(newTokens));
+
     return response.data.access;
   } catch (error) {
     console.error('Error refreshing access token:', error);
+    // Si no se puede refrescar el token, redirige al login
+    localStorage.removeItem('tokens');  // Elimina los tokens inválidos
+    window.location.href = '/login';
     throw error;
   }
-};
+};*/
+
+/*const refreshAccessToken = async () => {
+  try {
+    const storedTokens = localStorage.getItem('tokens');
+    if (!storedTokens) {
+      throw new Error('No tokens found in localStorage');
+    }
+
+    const { refresh } = JSON.parse(storedTokens);
+    
+    if (!refresh) {
+      throw new Error('No refresh token found');
+    }
+
+    const response = await axios.post(`${API_URL}/token/refresh/`, { refresh });
+
+    // Actualiza el token de acceso en localStorage
+    const newTokens = { access: response.data.access, refresh };
+    localStorage.setItem('tokens', JSON.stringify(newTokens));
+
+    return response.data.access;
+  } catch (error) {
+    console.error('Error refreshing access token:', error);
+    localStorage.removeItem('tokens'); // Elimina los tokens inválidos
+    window.location.href = '/login';    // Redirige al login si no se puede refrescar
+    throw error;
+  }
+};*/
 
 // Interceptor de respuesta para manejar errores 401 (Unauthorized)
-api.interceptors.response.use(
+/*api.interceptors.response.use(
   (response) => {
     return response;
   },
@@ -62,17 +133,34 @@ api.interceptors.response.use(
         return api(originalRequest); // Reintenta la solicitud original con el nuevo token
       } catch (err) {
         console.error('Error during token refresh:', err);
-        return Promise.reject(error); // Si falla la actualización del token, rechaza la solicitud
+        // Si falla la actualización del token, redirige al login
+        window.location.href = '/login';
+        return Promise.reject(error); 
       }
     }
 
     return Promise.reject(error);
   }
+);*/
+
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Si obtenemos un 401, hacemos logout
+      localStorage.removeItem('tokens'); // Elimina los tokens
+      window.location.href = '/login';   // Redirigir al login
+    }
+    return Promise.reject(error);
+  }
 );
 
+// Función de login para obtener los tokens y almacenarlos
 export const login = async (username, password) => {
   try {
-    const response = await axios.post(`${API_URL}/token/`, {
+    const response = await axios.post(`${api}/token/`, {
       username,
       password,
     });
@@ -94,18 +182,19 @@ export const login = async (username, password) => {
   }
 };
 
+export const fetchCamarasByDvr = async (dvrId) => {
+  try {
+    const response = await api.get(`/camaras/?dvr=${dvrId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching camaras:', error);
+    throw error;
+  }
+};
 
 // Función para obtener la lista de DVRs
 export const fetchDvrs = async () => {
   try {
-    // Verificar si el token está disponible antes de hacer la solicitud
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      console.error('No access token found. Redirecting to login.');
-      // Redirigir al login o lanzar un error para que la aplicación maneje este caso
-      throw new Error('No access token found. Please log in.');
-    }
-
     const response = await api.get('/dvrs/');
     return response.data;
   } catch (error) {
@@ -114,23 +203,13 @@ export const fetchDvrs = async () => {
   }
 };
 
-
 // Función para crear un nuevo DVR
 export const createDvr = async (dvrData) => {
   try {
-    // Verificar si el token está disponible antes de hacer la solicitud
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      throw new Error('No access token found. Please log in.');
-    }
-
     const response = await api.post('/dvrs/', dvrData);
     return response.data;
   } catch (error) {
     console.error('Error creating DVR:', error);
-    if (error.response && error.response.status === 401) {
-      console.error('Authentication error. Please log in again.');
-    }
     throw error;
   }
 };
@@ -138,18 +217,9 @@ export const createDvr = async (dvrData) => {
 // Función para eliminar DVR
 export const deleteDvr = async (dvrId) => {
   try {
-    // Verificar si el token está disponible antes de hacer la solicitud
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      throw new Error('No access token found. Please log in.');
-    }
-
     await api.delete(`/dvrs/${dvrId}/`);
   } catch (error) {
     console.error('Error deleting DVR:', error);
-    if (error.response && error.response.status === 401) {
-      console.error('Authentication error. Please log in again.');
-    }
     throw error;
   }
 };
@@ -210,49 +280,6 @@ export const deleteCamara = async (camaraId) => {
 
 export default api;
 
-/*import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../AuthContext'
-
-const Login = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const { login } = useAuth();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await login(username, password);
-      navigate('/home');
-    } catch (error) {
-      alert('Error de autenticación. Verifica tus credenciales.');
-    }
-  };
-
-  return (
-    <div>
-      <h2>Iniciar sesión</h2>
-      <form onSubmit={handleSubmit}>
-        <input 
-          type="text" 
-          placeholder="Usuario" 
-          value={username} 
-          onChange={(e) => setUsername(e.target.value)} 
-        />
-        <input 
-          type="password" 
-          placeholder="Contraseña" 
-          value={password} 
-          onChange={(e) => setPassword(e.target.value)} 
-        />
-        <button type="submit">Login</button>
-      </form>
-    </div>
-  );
-};
-
-export default Login;*/
 import React, { useState } from 'react';
 import { Container, Box, Typography, TextField, Button, CssBaseline } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
@@ -361,295 +388,22 @@ const Login = () => {
 export default Login;
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Login from './screens/Login'; // Componente de login
-import Home from './components/home'; // Componente protegido
-import ProtectedRoute from './routes/ProtectedRoute'; // Rutas protegidas
-import { AuthProvider } from './AuthContext'; // Contexto de autenticación
-
-const App = () => {
-  return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-          <Route path="*" element={<Login />} /> {/* Redirige todo lo desconocido al login */}
-        </Routes>
-      </Router>
-    </AuthProvider>
-  );
-};
-
-export default App;
-
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from 'axios';
-import {jwtDecode} from 'jwt-decode' // Asegúrate de tener instalada esta librería
-
-const AuthContext = createContext();
-
-export const AuthProvider = ({ children }) => {
-  const [authTokens, setAuthTokens] = useState(() => localStorage.getItem('tokens') ? JSON.parse(localStorage.getItem('tokens')) : null);
-  const [user, setUser] = useState(() => authTokens ? jwtDecode(authTokens.access) : null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (authTokens) {
-      setUser(jwtDecode(authTokens.access));
-    }
-    setLoading(false);
-  }, [authTokens]);
-
-  const login = async (username, password) => {
-    try {
-      const response = await axios.post('http://localhost:8000/api/token/', { username, password });
-      setAuthTokens(response.data);
-      localStorage.setItem('tokens', JSON.stringify(response.data));
-      setUser(jwtDecode(response.data.access));
-    } catch (error) {
-      console.error('Error al iniciar sesión', error);
-      throw error; // Permitir el manejo de errores en el frontend
-    }
-  };
-
-  const logout = () => {
-    setAuthTokens(null);
-    setUser(null);
-    localStorage.removeItem('tokens');
-  };
-
-  return (
-    <AuthContext.Provider value={{ authTokens, user, login, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export const useAuth = () => useContext(AuthContext);
-
-/*import React, { useEffect, useState } from 'react';
-import { Box, Typography } from '@mui/material';
-import { fetchDvrs, createDvr, deleteDvr, createRegistro } from '../services/apiService';
-import ProfileSidebar from './ProfileSidebar';
-import CameraTable from './CameraTable';
-import Swal from 'sweetalert2';
-import '../styles/CameraControlSystem.css';  // Importamos el archivo CSS
-import imagenBienvenida from '../assets/imagenBienvenida-removebg.png'; // Asegúrate de tener esta imagen en la carpeta correcta
-
-const Home = () => {
-  const [dvrs, setDvrs] = useState([]);
-  const [showCameraControl, setShowCameraControl] = useState(false);
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const dvrsData = await fetchDvrs();
-        setDvrs(dvrsData.map(dvr => ({
-          ...dvr,
-          diasGrabacion: '',
-          verificacionAM: false,
-          verificacionPM: false,
-          amDisabled: false,
-          pmDisabled: false,
-        })));
-      } catch (error) {
-        console.error('Failed to load DVRs:', error);
-      }
-    };
-    loadData();
-  }, []);
-
-  const handleEdit = (id, field, value) => {
-    setDvrs(prevDvrs => {
-      const updatedDvrs = prevDvrs.map(dvr => {
-        if (dvr.id === id) {
-          const updatedDvr = { ...dvr, [field]: value };
-  
-          if (field === 'fechaInicio' || field === 'fechaFinal') {
-            const { fechaInicio, fechaFinal } = updatedDvr;
-  
-            if (fechaInicio && fechaFinal) {
-              const startDate = new Date(fechaInicio);
-              const endDate = new Date(fechaFinal);
-              const daysOfRecording = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
-  
-              if (daysOfRecording > 0) {
-                updatedDvr.diasGrabacion = daysOfRecording;
-              } else {
-                updatedDvr.diasGrabacion = 0;
-              }
-            }
-          }
-  
-          return updatedDvr;
-        }
-        return dvr;
-      });
-  
-      return updatedDvrs;
-    });
-  };
-
-  const handleRegister = async (id) => {
-    const dvr = dvrs.find(dvr => dvr.id === id);
-  
-    // Verificar que al menos una verificación esté seleccionada
-    if (!dvr.verificacionAM && !dvr.verificacionPM) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Registro Incompleto',
-        text: 'Debe seleccionar al menos una verificación (AM o PM) para registrar.',
-      });
-      return;
-    }
-  
-    const registroData = {
-      dvr: id,
-      dias_grabacion: dvr.diasGrabacion,
-      verificacion_am: dvr.verificacionAM,
-      verificacion_pm: dvr.verificacionPM,
-      observacion: dvr.observacion,
-      fecha_inicio: dvr.fechaInicio ? new Date(dvr.fechaInicio).toISOString().split('T')[0] : null,
-      fecha_final: dvr.fechaFinal ? new Date(dvr.fechaFinal).toISOString().split('T')[0] : null,
-    };
-  
-    try {
-      await createRegistro(registroData);
-      Swal.fire({
-        icon: 'success',
-        title: 'Registro Exitoso',
-        text: 'El registro se ha creado correctamente.',
-      });
-  
-      if (dvr.verificacionAM) {
-        handleEdit(id, 'amDisabled', true);
-        handleEdit(id, 'verificacionAM', false);
-      }
-  
-      if (dvr.verificacionPM) {
-        handleEdit(id, 'pmDisabled', true);
-        handleEdit(id, 'verificacionPM', false);
-      }
-      
-      setDvrs(prevDvrs => [...prevDvrs]);
-  
-    } catch (error) {
-      console.error('Error creando el registro:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Hubo un error al crear el registro.',
-      });
-    }
-  };
-
-  const handleCreateDvr = async (newDvrData) => {
-    try {
-      const newDvr = await createDvr(newDvrData);
-      setDvrs([...dvrs, {
-        ...newDvr,
-        diasGrabacion: '',
-        verificacionAM: false,
-        verificacionPM: false,
-        amDisabled: false,
-        pmDisabled: false,
-      }]);
-    } catch (error) {
-      console.error('Error creating DVR:', error);
-    }
-  };
-
-  const handleDeleteDvr = async (id) => {
-    try {
-      await deleteDvr(id);
-      setDvrs(dvrs.filter(dvr => dvr.id !== id));
-    } catch (error) {
-      console.error('Error deleting DVR:', error);
-    }
-  };
-
-  const toggleContentVisibility = () => {
-    setShowCameraControl(true);
-  };
-
-  const username = localStorage.getItem('username');
-
-  return (
-    <Box className="camera-control-system">
-      <ProfileSidebar
-        username={username}
-        handleLogout={() => {
-          localStorage.removeItem('uid');
-          localStorage.removeItem('username');
-          window.location.href = '/';
-        }}
-        dvrs={dvrs}
-        onCreateDvr={handleCreateDvr}
-        onDeleteDvr={handleDeleteDvr}
-        onShowCameraControl={toggleContentVisibility}
-      />
-
-      <Box className="camera-control-content">
-        {showCameraControl ? (
-          <Box className="camera-table-wrapper">
-            <Typography variant="h4" gutterBottom sx={{ color: '#003366', textAlign: 'center' }}>
-              Control de Cámaras
-            </Typography>
-            <CameraTable
-              dvrs={dvrs}
-              handleEdit={handleEdit}
-              handleRegister={handleRegister}
-            />
-          </Box>
-        ) : (
-          <Box sx={{ textAlign: 'center', marginTop: '20px' }}>
-            <Typography
-              variant="h4"
-              gutterBottom
-              className="welcome-message"
-            >
-              Bienvenido al Control de Cámaras
-            </Typography>
-
-            {}
-            <img 
-              src={imagenBienvenida} 
-              alt="Control de Cámaras"
-              style={{ width: '400%', maxWidth: '400px', height: 'auto', marginTop: '20px', marginBottom: '20px' }} 
-            />
-          </Box>
-        )}
-      </Box>
-    </Box>
-  );
-};
-
-export default Home;
-
-import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { useNavigate } from 'react-router-dom';
 
-const Home = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+const ProtectedRoute = ({ children }) => {
+  const { authTokens, loading } = useAuth();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  if (loading) {
+    return <div>Cargando...</div>; // Puedes personalizar el mensaje de carga
+  }
 
-  return (
-    <div>
-      <h1>Bienvenido {user && user.username}</h1>
-      <button onClick={handleLogout}>Cerrar sesión</button>
-    </div>
-  );
+  // Si no hay tokens, redirige al login
+  return authTokens ? children : <Navigate to="/login" />;
 };
 
-export default Home;
-*/
+export default ProtectedRoute;
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -696,7 +450,7 @@ const Home = () => {
   };
 
   // Función para editar DVRs
-  const handleEdit = (id, field, value) => {
+  /*const handleEdit = (id, field, value) => {
     setDvrs(prevDvrs => {
       const updatedDvrs = prevDvrs.map(dvr => {
         if (dvr.id === id) {
@@ -721,7 +475,41 @@ const Home = () => {
 
       return updatedDvrs;
     });
-  };
+  };*/
+
+  const handleEdit = (id, field, value) => {
+    setDvrs(prevDvrs => {
+      const updatedDvrs = prevDvrs.map(dvr => {
+        if (dvr.id === id) {
+          const updatedDvr = { ...dvr, [field]: value };
+  
+          if (field === 'fechaInicio' || field === 'fechaFinal') {
+            const { fechaInicio, fechaFinal } = updatedDvr;
+  
+            if (fechaInicio && fechaFinal) {
+              // Asegúrate de convertir el valor a objetos de fecha válidos
+              const startDate = new Date(fechaInicio);
+              const endDate = new Date(fechaFinal);
+  
+              // Asegúrate de que ambas fechas sean válidas
+              if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                const daysOfRecording = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+  
+                updatedDvr.diasGrabacion = daysOfRecording > 0 ? daysOfRecording : 0;
+              } else {
+                updatedDvr.diasGrabacion = 0; // Si las fechas no son válidas, el número de días es 0
+              }
+            }
+          }
+  
+          return updatedDvr;
+        }
+        return dvr;
+      });
+  
+      return updatedDvrs;
+    });
+  };  
 
   // Manejo del registro de DVRs
   const handleRegister = async (id) => {
@@ -853,262 +641,254 @@ const Home = () => {
 
 export default Home;
 
-import React, { useState } from "react";
-import {
-  Box,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Checkbox,
-  TextField,
-  Button,
-  Popover,
-  Typography,
-} from "@mui/material";
-import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
-import "../styles/CameraTable.css";
-
-const CameraTable = ({ dvrs, handleEdit, handleRegister }) => {
-  const [page, setPage] = useState(0); // Estado para la página actual
-  const [anchorEl, setAnchorEl] = useState(null); // Estado para el Popover
-  const [currentDvrId, setCurrentDvrId] = useState(null); // Para identificar el DVR al que le estamos agregando la observación
-  const rowsPerPage = 9; // Número de filas a mostrar por página
-
-  const handleChangePage = (newPage) => {
-    setPage(newPage);
-  };
-
-  const paginatedDvrs = dvrs.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  // Abre el Popover (menú) para la observación
-  const handleOpenObservation = (event, dvrId) => {
-    setAnchorEl(event.currentTarget);
-    setCurrentDvrId(dvrId); // Guardamos el id del DVR actual
-  };
-
-  // Cierra el Popover
-  const handleCloseObservation = () => {
-    setAnchorEl(null);
-    setCurrentDvrId(null); // Limpiamos el id del DVR actual
-  };
-
-  const open = Boolean(anchorEl);
-  const id = open ? "simple-popover" : undefined;
-
-  return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box className="camera-table-container">
-        <TableContainer component={Paper} className="table-container">
-          <Table>
-            <TableHead className="table-head">
-              <TableRow>
-                {[
-                  "Fecha",
-                  "DVR",
-                  "Ubicación",
-                  "Días de Grabación",
-                  "Fecha de Inicio",
-                  "Fecha Final",
-                  "Verificación AM",
-                  "Verificación PM",
-                  "Obs.",  // Encabezado más corto para observación
-                  "Acciones", // Manteniendo las acciones originales
-                ].map((header) => (
-                  <TableCell key={header} className="table-cell-header">
-                    {header}
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedDvrs.map((dvr) => (
-                <TableRow key={dvr.id} className="table-row">
-                  <TableCell className="table-cell">
-                    {new Date().toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="table-cell">{dvr.nombre}</TableCell>
-                  <TableCell className="table-cell">{dvr.ubicacion}</TableCell>
-                  <TableCell className="table-cell">
-                    <TextField
-                      type="number"
-                      name="diasGrabacion"
-                      value={dvr.diasGrabacion || ""}
-                      onChange={(e) =>
-                        handleEdit(dvr.id, "diasGrabacion", e.target.value)
-                      }
-                      className="text-field"
-                      variant="outlined"
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell className="table-cell">
-                    <DatePicker
-                      label=""
-                      value={dvr.fechaInicio || null}
-                      onChange={(date) =>
-                        handleEdit(dvr.id, "fechaInicio", date)
-                      }
-                      slotProps={{
-                        textField: {
-                          variant: "outlined",
-                          size: "small",
-                          fullWidth: true,
-                        },
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell className="table-cell">
-                    <DatePicker
-                      label=""
-                      value={dvr.fechaFinal || null}
-                      onChange={(date) =>
-                        handleEdit(dvr.id, "fechaFinal", date)
-                      }
-                      slotProps={{
-                        textField: {
-                          variant: "outlined",
-                          size: "small",
-                          fullWidth: true,
-                        },
-                      }}
-                    />
-                  </TableCell>
-
-                  <TableCell className="table-cell">
-                    <Checkbox
-                      checked={dvr.verificacionAM || false}
-                      onChange={(e) =>
-                        handleEdit(dvr.id, "verificacionAM", e.target.checked)
-                      }
-                      className="checkbox"
-                      disabled={dvr.amDisabled}
-                    />
-                  </TableCell>
-                  <TableCell className="table-cell">
-                    <Checkbox
-                      checked={dvr.verificacionPM || false}
-                      onChange={(e) =>
-                        handleEdit(dvr.id, "verificacionPM", e.target.checked)
-                      }
-                      className="checkbox"
-                      disabled={dvr.pmDisabled}
-                    />
-                  </TableCell>
-
-                  {/* Nueva celda para el botón de Observación */}
-                  <TableCell className="table-cell">
-                    <Button
-                      variant="outlined"
-                      onClick={(event) => handleOpenObservation(event, dvr.id)}
-                    >
-                      Obs.
-                    </Button>
-                  </TableCell>
-
-                  {/* Celda para el botón de Registrar en Acciones */}
-                  <TableCell className="table-cell">
-                    <Button
-                      variant="contained"
-                      onClick={() => handleRegister(dvr.id)}
-                      className="register-button"
-                      startIcon={<AssignmentTurnedInIcon />}
-                    >
-                      Registrar
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          <div className="pagination">
-            <Button
-              onClick={() => handleChangePage(page - 1)}
-              disabled={page === 0}
-              className="pagination-button"
-            >
-              Anterior
-            </Button>
-            <Button
-              onClick={() => handleChangePage(page + 1)}
-              disabled={page >= Math.ceil(dvrs.length / rowsPerPage) - 1}
-              className="pagination-button"
-            >
-              Siguiente
-            </Button>
-          </div>
-        </TableContainer>
-      </Box>
-
-      {/* Popover para agregar observación */}
-      <Popover
-        id={id}
-        open={open}
-        anchorEl={anchorEl}
-        onClose={handleCloseObservation}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "center",
-        }}
-        transformOrigin={{
-          vertical: "top",
-          horizontal: "center",
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Observación
-          </Typography>
-          <TextField
-            label="Escriba su observación"
-            value={
-              paginatedDvrs.find((dvr) => dvr.id === currentDvrId)?.observacion ||
-              ""
-            }
-            onChange={(e) =>
-              handleEdit(currentDvrId, "observacion", e.target.value)
-            }
-            variant="outlined"
-            multiline
-            rows={4}
-            fullWidth
-          />
-          <Button
-            onClick={handleCloseObservation}
-            variant="contained"
-            sx={{ mt: 2 }}
-          >
-            Guardar
-          </Button>
-        </Box>
-      </Popover>
-    </LocalizationProvider>
-  );
-};
-
-export default CameraTable;
+// App.js
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../AuthContext';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Login from './screens/Login'; // Componente de login
+import Home from './components/home'; // Componente protegido
+import ProtectedRoute from './routes/ProtectedRoute'; // Rutas protegidas
+import { AuthProvider } from './AuthContext'; // Contexto de autenticación
 
-const ProtectedRoute = ({ children }) => {
-  const { authTokens, loading } = useAuth();
-
-  if (loading) {
-    return <div>Cargando...</div>; // Puedes personalizar el mensaje de carga
-  }
-
-  return authTokens ? children : <Navigate to="/login" />;
+const App = () => {
+  return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+          <Route path="*" element={<Login />} /> {/* Redirige todo lo desconocido al login */}
+        </Routes>
+      </AuthProvider>
+    </Router>
+  );
 };
 
-export default ProtectedRoute;
+export default App;
+
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import axios from 'axios';
+import jwtDecode from 'jwt-decode';
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [authTokens, setAuthTokens] = useState(() =>
+    localStorage.getItem('tokens') ? JSON.parse(localStorage.getItem('tokens')) : null
+  );
+  const [user, setUser] = useState(() =>
+    authTokens ? jwtDecode(authTokens.access) : null
+  );
+  const [loading, setLoading] = useState(true);
+
+  // Función para obtener la URL base de la API según el entorno
+  const getApiBaseUrl = () => {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000/api';  // URL en desarrollo
+    }
+    return 'http://172.168.11.229:8000/api';  // URL en la red local del servidor
+  };
+  
+
+  const isTokenExpired = (token) => {
+    if (!token) return true;
+    const decodedToken = jwtDecode(token);
+    const now = Math.floor(Date.now() / 1000);
+    return decodedToken.exp < now;
+  };
+
+  const logout = () => {
+    setAuthTokens(null);
+    setUser(null);
+    localStorage.removeItem('tokens');
+    window.location.href = '/login';
+  };
+
+  const checkTokenExpiration = useCallback(() => {
+    if (authTokens && isTokenExpired(authTokens.access)) {
+      logout();
+    }
+  }, [authTokens]);
+
+  const refreshToken = async () => {
+    try {
+      const api = axios.create({
+        baseURL: getApiBaseUrl(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true,
+      });
+
+      const response = await api.post('/token/refresh/', {
+        refresh: authTokens?.refresh,
+      });
+
+      const newTokens = {
+        ...authTokens,
+        access: response.data.access,
+      };
+
+      localStorage.setItem('tokens', JSON.stringify(newTokens));
+      setAuthTokens(newTokens);
+      setUser(jwtDecode(newTokens.access));
+
+      return newTokens;
+    } catch (error) {
+      console.error('Error al refrescar el token', error);
+      logout();
+      throw error;
+    }
+  };
+
+  /*const login = async (username, password) => {
+    try {
+      const api = axios.create({
+        baseURL: getApiBaseUrl(),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true,
+      });
+
+      const response = await api.post('/token/', { username, password });
+      const tokens = response.data;
+
+      if (!tokens.access || !tokens.refresh) {
+        throw new Error('Error al recibir los tokens');
+      }
+
+      const decodedUser = jwtDecode(tokens.access);
+
+      localStorage.setItem('tokens', JSON.stringify(tokens));
+      setAuthTokens(tokens);
+      setUser(decodedUser);
+
+      return tokens;
+    } catch (error) {
+      console.error('Error al iniciar sesión', error);
+      throw error;
+    }
+  };*/
+
+  const login = async (username, password) => {
+    try {
+      // Crear instancia de axios con configuración para CORS y la API JWT
+      const api = axios.create({
+        baseURL: getApiBaseUrl(),  // Obtener la URL base según el entorno
+        headers: {
+          'Content-Type': 'application/json',  // Tipo de contenido en JSON
+        },
+        withCredentials: true,  // Habilitar el envío de cookies y credenciales
+      });
+  
+      // Enviar solicitud POST para obtener los tokens
+      const response = await api.post('/token/', { username, password });
+  
+      // Obtener los tokens de la respuesta
+      const tokens = response.data;
+  
+      // Verificar si se recibieron los tokens de acceso y refresh
+      if (!tokens.access || !tokens.refresh) {
+        throw new Error('Error al recibir los tokens');
+      }
+  
+      // Decodificar el token de acceso para obtener información del usuario
+      const decodedUser = jwtDecode(tokens.access);
+  
+      // Guardar los tokens en el almacenamiento local
+      localStorage.setItem('tokens', JSON.stringify(tokens));
+  
+      // Actualizar el estado con los tokens y el usuario decodificado
+      setAuthTokens(tokens);
+      setUser(decodedUser);
+  
+      return tokens;
+    } catch (error) {
+      // Imprimir error en consola para depuración
+      console.error('Error al iniciar sesión', error);
+  
+      // Personalizar el mensaje de error para el frontend (opcional)
+      if (error.response && error.response.status === 401) {
+        throw new Error('Credenciales incorrectas. Por favor, revisa tu nombre de usuario y contraseña.');
+      } else if (error.message === 'Network Error') {
+        throw new Error('Error de red. No se pudo conectar con el servidor.');
+      } else {
+        throw new Error('Ocurrió un error inesperado. Inténtalo de nuevo.');
+      }
+    }
+  };  
+
+  const axiosInstance = axios.create({
+    baseURL: getApiBaseUrl(),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    withCredentials: true,
+  });
+
+  axiosInstance.interceptors.request.use(
+    async (config) => {
+      if (authTokens) {
+        if (isTokenExpired(authTokens.access)) {
+          const newTokens = await refreshToken();
+          config.headers.Authorization = `Bearer ${newTokens.access}`;
+        } else {
+          config.headers.Authorization = `Bearer ${authTokens.access}`;
+        }
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkTokenExpiration();
+    }, 60000); // Verificar cada minuto
+
+    return () => clearInterval(interval);
+  }, [checkTokenExpiration]);
+
+  useEffect(() => {
+    checkTokenExpiration();
+    setLoading(false);
+  }, [checkTokenExpiration]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        authTokens,
+        user,
+        login,
+        logout,
+        loading,
+        axiosInstance,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
+
+export default AuthContext;
+
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import AppRoutes from './routes';
+import { AuthProvider } from './AuthContext'; // Contexto de autenticación
+
+const container = document.getElementById('root');
+const root = createRoot(container);
+
+root.render(
+  <AuthProvider>
+    <AppRoutes />
+  </AuthProvider>
+);
+

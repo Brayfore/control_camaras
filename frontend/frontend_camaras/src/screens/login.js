@@ -1,46 +1,3 @@
-/*import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../AuthContext'
-
-const Login = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const { login } = useAuth();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await login(username, password);
-      navigate('/home');
-    } catch (error) {
-      alert('Error de autenticación. Verifica tus credenciales.');
-    }
-  };
-
-  return (
-    <div>
-      <h2>Iniciar sesión</h2>
-      <form onSubmit={handleSubmit}>
-        <input 
-          type="text" 
-          placeholder="Usuario" 
-          value={username} 
-          onChange={(e) => setUsername(e.target.value)} 
-        />
-        <input 
-          type="password" 
-          placeholder="Contraseña" 
-          value={password} 
-          onChange={(e) => setPassword(e.target.value)} 
-        />
-        <button type="submit">Login</button>
-      </form>
-    </div>
-  );
-};
-
-export default Login;*/
 import React, { useState } from 'react';
 import { Container, Box, Typography, TextField, Button, CssBaseline } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
@@ -131,7 +88,7 @@ const Login = () => {
                 mt: 2,
                 backgroundColor: '#003366',
                 '&:hover': {
-                  backgroundColor: '#001f3f',
+                  backgroundAColor: '#001f3f',
                 },
                 display: 'block',
                 margin: '0 auto',
