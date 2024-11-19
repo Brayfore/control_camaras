@@ -18,7 +18,6 @@ class Camara(models.Model):
     puerto = models.PositiveIntegerField()
     dvr_nombre = models.CharField(max_length=100)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)  # Añadimos el campo de usuario
-
     class Meta:
         unique_together = ('dvr', 'puerto')
         
